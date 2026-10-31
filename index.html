@@ -381,11 +381,12 @@ padding: 14px 0; text-shadow: 3px 3px 0 #400; animation: warn 2s forwards;
     <div class="hero">📏</div>
     <h1 style="font-size:20px;">この ゲームの 約束</h1>
     <div class="points">
-      <div>・数直線の 目盛りは、ことわりが なければ <b>1目盛り ＝ 1歩</b></div>
+      <div>・数直線の <b>区切りは 1歩</b>（長さ では ない。比の 1つ分）。<b>マス</b>の 問題だけ 目盛りが 長さ</div>
+      <div>・<b>1歩</b> ＝ <span data-m="{マス|歩}"></span>（わかって いる 長さを 最後に 当てる）</div>
       <div>・A・B は 線分の 2つの 点、<b>P</b> は 寄り道の 点</div>
       <div>・図の <b style="color:#ff9f43">オレンジ</b>は スタートから 寄り道までの 歩、<b style="color:#4f8dff">青</b>は 寄り道から ゴールまでの 歩</div>
       <div>・計算は しない。どの 範囲に 出るか・何歩かを 決める</div>
-      <div>・三角形の 図：直線 BC の 目盛りも 1目盛り ＝ 1歩。辺の 数字は 長さ</div>
+      <div>・三角形の 図：直線 BC の 区切りも 1歩。辺の 数字は 長さ</div>
     </div>
     <button class="how-btn" id="ruleDef">📐 内分・外分と 二等分線の 約束</button>
     <button class="start-btn" id="ruleClose">▶ もどる</button>
@@ -566,6 +567,27 @@ function triGeo(q) {   // 三角形の 形：B(0, 0)、C(a, 0)、A（余弦定�
   const { a, b, c } = q, ax = (a * a + c * c - b * b) / (2 * a);
   return { ax, ay: Math.sqrt(Math.max(0, c * c - ax * ax)) };
 }
+// ---------- マスで 求める（第2・3章 マスヨミ・ソトマス）：見当 → 歩で 指定 → 最後に わかって いる マス（AB の 長さ）を 当てて「{マス|歩}」----------
+// q.L：AB の マス数。1歩 ＝ {L|D} マス（D：A から B までの 歩数）。★の 回で 割り切れる 割合を かえる（1回め 8割 → 2回め 半分 → 3回め 2割）
+const MAS_PAIRS = PAIRS.filter(([m, n]) => m + n <= 5);
+const fracStr = (a, b) => { const g = gcd(a, b) || 1, x = a / g, y = b / g; return y === 1 ? num(x) : (x < 0 ? '−' : '') + '{' + Math.abs(x) + '|' + y + '}'; };
+const masD = q => (q.io === 'in' ? q.m + q.n : Math.abs(q.m - q.n));
+const masP = q => { const D = masD(q), s = q.io === 'out' && q.m < q.n ? -1 : 1; return s * q.m * q.L / D; };   // A から P まで（A ＝ 0、B ＝ L。左が マイナス）
+function masPrm(rng, io, slot, coord) {
+  const div = rng() < ({ 0: 0.8, 1: 0.5, 2: 0.2 }[slot && slot.play] ?? 0.5);
+  for (let i = 0; i < 500; i++) {
+    const [m, n] = pick(rng, MAS_PAIRS), D = io === 'in' ? m + n : Math.abs(m - n);
+    if (!div && D < 2) continue;
+    const L = div ? D * pick(rng, [2, 3]) : ri(rng, 4, 9);
+    if (L > 12 || L === D || (L % D === 0) !== div) continue;
+    const q = { io, m, n, st: 'A', rv: 0, L, a: coord ? pick(rng, [-3, -2, -1, 1, 2]) : 0 };
+    const P = masP(q), lo = Math.min(0, P) - 1, hi = Math.max(L, P) + 1;
+    if (hi - lo <= 14) return q;
+  }
+  return { io, m: 2, n: 1, st: 'A', rv: 0, L: 6, a: coord ? -2 : 0 };
+}
+const MAS_MODES = ['masIn', 'masOut'];
+const isMas = q => MAS_MODES.includes(q.mode);
 const coordAt = (q, t) => q.a + t * q.c;   // 座標の 問題（1目盛り ＝ 1歩 ＝ 座標 c）
 // 座標の 問題の 1歩 c：AB は 4〜12、スタートから 寄り道までも 12 まで（暗算できる 数）
 const coordCs = (m, n, io) => { const D = io === 'in' ? m + n : Math.abs(m - n); return [1, 2, 3, 4, 6].filter(c => D * c >= 4 && D * c <= 12 && Math.max(m, n) * c <= 12); };
@@ -603,11 +625,27 @@ function makeOptions(q, rng) {
       : [[m, d, ['whole']], [d, n, ['whole']], [n, d, ['whole']], [d, m, ['whole']]]);
     cand.forEach(([a, b, t]) => { const v = a / b; if (seen.some(x => Math.abs(x - v) < 1e-9)) return; seen.push(v); add(a + ':' + b, a + ':' + b, t); });
   }
-  if (mode === 'stepIn' || mode === 'stepOut') {   // 1歩の 長さ ＝ AB の {1|歩数}
+  if (mode === 'stepIn' || mode === 'stepOut') {   // 1歩は AB を 何等分した 長さ（作図で AB を 何等分 するか）
     const s = m + n, d = Math.abs(m - n), seen = new Set();
     const cand = q.io === 'in' ? [[s, []], [d, ['diff']], [s + 1, ['pts']], [m, ['one']], [n, ['one']]]
       : [[d, []], [s, ['sum']], [d + 1, ['pts']], [Math.min(m, n), ['one']], [Math.max(m, n), ['one']]];
-    cand.forEach(([k, t]) => { if (k < 1 || seen.has(k)) return; seen.add(k); add(k === 1 ? 'AB と 同じ 長さ' : 'AB の {1|' + k + '}', k, t); });
+    cand.forEach(([k, t]) => { if (k < 1 || seen.has(k)) return; seen.add(k); add(k === 1 ? 'AB が そのまま 1歩' : 'AB を ' + k + '等分', k, t); });
+  }
+  if (isMas(q) && q.st2 !== 2) {   // ① 1歩は 何マス？（{マス|歩}）
+    const D = masD(q), alt = q.io === 'in' ? Math.abs(m - n) : m + n;
+    [[q.L, D, []], [D, q.L, ['flipM']], [q.L, alt, [q.io === 'in' ? 'diff' : 'sum']], [1, 1, ['tick']]].forEach(([a, b, t]) => { if (b > 0) add(fracStr(a, b) + ' マス', (a / b).toFixed(9), t); });
+  }
+  if (isMas(q) && q.st2 === 2) {   // ② AP（座標の 問題は P の 座標）は？ 式を えらぶ
+    const D = masD(q), S = fracStr(q.L, D), F = fracStr(D, q.L), sg = q.io === 'out' && m < n ? -1 : 1;
+    const E = (st, k, s_, start) => (q.a ? num(start) + (s_ < 0 ? ' − ' : ' ＋ ') : '') + st + ' × ' + k;
+    const V = (v, k, s_, start) => ((q.a ? start : 0) + s_ * v * k).toFixed(9);
+    add(E(S, m, sg, q.a) + (q.a ? '' : ' マス'), V(q.L / D, m, sg, q.a), []);
+    add(E(S, n, sg, q.a) + (q.a ? '' : ' マス'), V(q.L / D, n, sg, q.a), ['swap']);
+    add(E(F, m, sg, q.a) + (q.a ? '' : ' マス'), V(D / q.L, m, sg, q.a), ['flipM']);
+    if (q.a) add(num(q.a + q.L) + (sg < 0 ? ' ＋ ' : ' − ') + S + ' × ' + m, (q.a + q.L - sg * m * q.L / D).toFixed(9), ['ab']);
+    add((q.a ? num(q.a) + (sg < 0 ? ' − ' : ' ＋ ') : '') + m + (q.a ? '' : ' マス'), ((q.a || 0) + sg * m).toFixed(9), ['tick']);   // 1マスを 1歩に した
+    const alt = q.io === 'in' ? Math.abs(m - n) : m + n;   // A から B の 歩数を 差・和で まちがえた
+    if (alt > 0) add(E(fracStr(q.L, alt), m, sg, q.a) + (q.a ? '' : ' マス'), V(q.L / alt, m, sg, q.a), [q.io === 'in' ? 'diff' : 'sum']);
   }
   if (mode === 'bsRatio' || mode === 'exRatio') {   // BD : DC（BE : EC）は どの 辺の 比？
     add('AB : AC', 'r', []); add('AC : AB', 's', ['swapS']); add('AB : BC', 't', ['side3']); add('AC : BC', 'u', ['side3']);
@@ -635,7 +673,7 @@ function texts(q) {
     place: () => [['▼ どの 範囲？', s + ' を ' + r + ' に ' + io + 'する 点は どの 範囲に ある？'], [s + ' を ' + r + ' に ' + io + 'する 点 P は どの 範囲に あるか、図で 選べ。']],   // 「どこ」だと 1点を 指そうと するので「どの 範囲」（10-31 先生）
     tapIn: () => [['▼ 点を タップ', s + ' を ' + r + ' に ' + io + 'する 点を タップ'], [s + ' を ' + r + ' に ' + io + 'する 点 P を 図示せよ。']],
     readIn: () => [['▼ 比を 読む', '図の 点 P は ' + s + ' を どんな 比に ' + io + 'する？'], ['図の 点 P は、' + s + ' を どのような 比に ' + io + 'するか。']],
-    stepIn: () => [['▼ 1歩の 長さ', s + ' を ' + r + ' に ' + io + '。1歩は AB の どれだけ？'], [s + ' を ' + r + ' に ' + io + 'する 点を とる。1歩分の 長さは AB の 何倍か。']],   // 「1目盛り（マス）」は 図の 具体的な 長さ、「1歩」は 相対的な 長さ（11-01 先生）
+    stepIn: () => [['▼ 何等分？', s + ' を ' + r + ' に ' + io + '。1歩は AB を 何等分した 長さ？'], [s + ' を ' + r + ' に ' + io + 'する 点を 作図する。AB を 何等分 するか。']],   // 先生の ノート：「スタートから ゴールを 3等分した とき スタートから 2番目の 点」（11-01）
     pair: () => [['▼ 2つの 外分', '図の P は 線分AB を ' + q.m + ':' + q.n + ' に 外分する 点。' + q.n + ':' + q.m + ' に 外分する 点 Q は どの 範囲に ある？'],
       ['図の 点 P は 線分AB を ' + q.m + ':' + q.n + ' に 外分する 点で ある。' + q.n + ':' + q.m + ' に 外分する 点 Q は どの 範囲に あるか、図で 選べ。']],
     coord: () => { const L = nl(q), A = 'A(' + num(coordAt(q, L.A)) + ')', B = 'B(' + num(coordAt(q, L.B)) + ')';
@@ -643,7 +681,20 @@ function texts(q) {
   };
   T.placeSame = T.place; T.placeST = T.place; T.tapOut = T.tapIn; T.tapST = T.tapIn; T.readOut = T.readIn; T.stepOut = T.stepIn;
   if (isTri(q)) return triTexts(q);
+  if (isMas(q)) return masTexts(q);
+  if ((q.mode === 'tapIn' || q.mode === 'tapOut') && !q.k && q.st2 !== 2)   // 連れ問 ①：見当（位置関係が 決まってから 歩の 区切り）
+    return [['▼ ① どの 範囲？', s + ' を ' + r + ' に ' + io + 'する 点は どの 範囲に ある？'], [s + ' を ' + r + ' に ' + io + 'する 点 P を 図示せよ。まず、P は どの 範囲に あるか。']];
+  if ((q.mode === 'tapIn' || q.mode === 'tapOut') && q.st2 === 2)
+    return [['▼ ② 何歩め？', s + ' を ' + r + ' に ' + io + 'する 点を タップ（区切りは 1歩）'], [s + ' を ' + r + ' に ' + io + 'する 点 P を 図示せよ。']];
   return T[q.mode]();
+}
+function masTexts(q) {
+  const s = segStr(q), r = ratioStr(q), io = IO_JP[q.io], D = masD(q), S = fracStr(q.L, D);
+  const AB = q.a ? '2点 A(' + num(q.a) + ')、B(' + num(q.a + q.L) + ')' : 'AB ＝ ' + q.L + 'マス', what = q.a ? 'P の 座標' : 'AP';
+  if (q.st2 !== 2) return [['▼ ① 1歩は 何マス？', AB + '。' + s + ' を ' + r + ' に ' + io + 'する 点 P。1歩は 何マス？'],
+    [(q.a ? '数直線 上の ' + AB + ' に ついて、' : '線分AB の 長さが ' + q.L + ' の とき、') + s + ' を ' + r + ' に ' + io + 'する 点 P の ' + (q.a ? '座標' : 'AP の 長さ') + 'を 求めよ。まず 1歩分の 長さは？']];
+  return [['▼ ② ' + what + 'は？', '1歩 ＝ ' + S + 'マス。' + s + ' を ' + r + ' に ' + io + 'する 点 P。' + what + 'は？'],
+    ['1歩分の 長さは ' + S + '。' + (q.a ? 'P の 座標' : 'AP の 長さ') + 'を 求める 式は？']];
 }
 function triTexts(q) {
   const tri = '△ABC で、AB ＝ ' + q.c + '、AC ＝ ' + q.b + ' と する。';
@@ -673,8 +724,16 @@ function triReason(q) {
   if (q.mode === 'bsLen') add('BD ＝ BC の {' + m + '|' + (m + n) + '}（BC を ' + (m + n) + ' 等分した ' + m + 'つ分）');
   return out;
 }
+function masReason(q) {
+  const out = [], add = s => out.push(s), D = masD(q), S = fracStr(q.L, D), m = q.m, n = q.n;
+  add(ratioStr(q) + ' に ' + IO_JP[q.io] + ' → A から B までは ' + (q.io === 'in' ? m + ' ＋ ' + n : Math.max(m, n) + ' − ' + Math.min(m, n)) + ' ＝ ' + D + '歩');
+  add('1歩 ＝ {マス|歩} ＝ {' + q.L + '|' + D + '}' + (fracStr(q.L, D) !== '{' + q.L + '|' + D + '}' ? ' ＝ ' + S : '') + ' マス');
+  if (q.st2 === 2) add('P は A から ' + (q.io === 'out' && m < n ? '外へ ' : '') + m + '歩 → ' + S + ' × ' + m + (q.a ? '（A(' + num(q.a) + ') から ' + (q.io === 'out' && m < n ? '左' : '右') + 'へ）' : ' マス'));
+  return out;
+}
 function reasonLines(q) {
   if (isTri(q)) return triReason(q);
+  if (isMas(q)) return masReason(q);
   const L = nl(q), S = q.st === 'B' ? 'B' : 'A', E = S === 'A' ? 'B' : 'A', m = q.m, n = q.n, out = [], mode = q.mode;
   const add = s => out.push(s);
   if (mode === 'pair') {
@@ -696,7 +755,7 @@ function reasonLines(q) {
   }
   if (L.k > 1) add('1目盛りは 1歩 では ない：A から B までの ' + L.D * L.k + '目盛りが ' + L.D + '歩 → 1歩 ＝ ' + L.k + '目盛り');
   if (mode === 'readIn' || mode === 'readOut') add('A から P まで ' + m + '歩、P から B まで ' + n + '歩 → ' + m + ':' + n);
-  if (mode === 'stepIn' || mode === 'stepOut') add('→ 1歩は AB の ' + (L.D === 1 ? '長さ そのもの' : '{1|' + L.D + '}'));
+  if (mode === 'stepIn' || mode === 'stepOut') add('→ 1歩は AB を ' + (L.D === 1 ? '等分 しない（AB が そのまま 1歩）' : L.D + '等分した 長さ'));
   if (mode === 'coord') add('1歩 ＝ ' + q.c + '。' + S + '(' + num(coordAt(q, L.S)) + ') から ' + m + '歩 → 座標 ' + num(coordAt(q, L.ans)));
   return out;
 }
@@ -707,11 +766,11 @@ const CHAPTERS = [
   { ch: 1, lv: 1, title: '第1章 どの 範囲に ある？', forms: ['place', 'placeST'], plays: [['place', 'placeST'], ['placeST', 'place'], ['place', 'MAB']], intro: true,
     mab: { form: 'mabPair', name: 'カガミヨリ', sprite: '🪞', tip: 'm:n と n:m の 外分は、反対がわの 外に 出る' },
     boss: { name: 'ヨリミチオウ', sprite: '🏰' } },
-  { ch: 2, lv: 2, title: '第2章 内分の 点', forms: ['tapIn', 'readIn', 'stepIn'], plays: [['tapIn', 'readIn'], ['stepIn', 'tapIn'], ['readIn', 'MAB']],
-    mab: { form: 'mabTapIn', name: 'カクレメモリ', sprite: '🎭', tip: '1目盛りが 1歩 とは かぎらない。A から B までの 歩数で 1歩を 決める' },
+  { ch: 2, lv: 2, title: '第2章 内分の 点', forms: ['tapIn', 'stepIn', 'masIn'], plays: [['tapIn', 'stepIn'], ['masIn', 'tapIn'], ['masIn', 'MAB']],
+    mab: { form: 'mabMasIn', name: 'ザヒョウヌシ', sprite: '🗺️', tip: '座標でも 1歩 ＝ {マス|歩}。A の 座標から m歩' },
     boss: { name: 'ナイブンオウ', sprite: '🗿' } },
-  { ch: 3, lv: 3, title: '第3章 外分の 点', forms: ['tapOut', 'readOut', 'stepOut'], plays: [['tapOut', 'readOut'], ['stepOut', 'tapOut'], ['readOut', 'MAB']],
-    mab: { form: 'mabTapOut', name: 'トオマワリ', sprite: '🌪️', tip: '外分でも 1歩を 先に 決める。A から B までは（多いほう − 少ないほう）歩' },
+  { ch: 3, lv: 3, title: '第3章 外分の 点', forms: ['tapOut', 'stepOut', 'masOut'], plays: [['tapOut', 'stepOut'], ['masOut', 'tapOut'], ['masOut', 'MAB']],
+    mab: { form: 'mabMasOut', name: 'トオマワリ', sprite: '🌪️', tip: '外分の 座標：1歩 ＝ {マス|歩}（歩は 多いほう − 少ないほう）。外へ 出る 向きに 注意' },
     boss: { name: 'ガイブンオウ', sprite: '🏯' } },
   { ch: 4, lv: 4, title: '第4章 内角の 二等分線', forms: ['bsRatio', 'bsTap', 'bsWhich'], plays: [['bsRatio', 'bsTap'], ['bsWhich', 'bsRatio'], ['bsTap', 'MAB']],
     mab: { form: 'mabBsLen', name: 'ブンスウワケ', sprite: '🍰', tip: 'BD : DC ＝ m : n → BD は BC の {m|m ＋ n}' },
@@ -731,14 +790,14 @@ NORM_CH.forEach(c => { if (c.mab) FORM_LV[c.mab.form] = c.lv; });
 const MONSTERS = [
   ['place', 'ヨリミチ', '🚏', '内分は スタートと ゴールの 間（1:1 は ちょうど まんなか）、外分は 歩数が 少ないほうの 外'],
   ['tapIn', 'ナイブン', '📌', 'スタートから m歩、そこから n歩で ちょうど ゴール（線分BA は B が スタート）'],
-  ['readIn', 'ホスウヨミ', '🔢', '比は（スタート → 寄り道の 歩数）:（寄り道 → ゴールの 歩数）'],
-  ['stepIn', 'ヒトアシ', '🦶', '内分は A から B までを（m ＋ n）歩に 分ける'],
+  ['stepIn', 'ヒトアシ', '🦶', '内分は AB を（m ＋ n）等分 → 1歩'],
+  ['masIn', 'マスヨミ', '🔢', '1歩 ＝ {マス|歩}。AP ＝ 1歩 × m（割り切れなくても よい）'],
   ['tapOut', 'ソトヨリ', '🚀', '少ないほうの 外へ 出る。もどる 歩も 同じ 長さ（線分BA は B が スタート）'],
-  ['readOut', 'ソトヨミ', '🔭', '外分も（スタート → 寄り道）:（寄り道 → ゴール）の 歩数'],
-  ['stepOut', 'モドリアシ', '↩️', '外分は もどる 歩を 引いて、A から B までは（多いほう − 少ないほう）歩'],
+  ['stepOut', 'モドリアシ', '↩️', '外分は AB を（多いほう − 少ないほう）等分 → 1歩'],
+  ['masOut', 'ソトマス', '🔭', '外分も 1歩 ＝ {マス|歩}。AP は 外へ 1歩 × m'],
   ['placeST', 'サキモジ', '🔤', '線分BA は 先に 書いて ある B が スタート。外分は スタート B で 歩数を くらべる'],
   ['bsRatio', 'ニトウブン', '⚖️', '∠A の 二等分線：BD : DC ＝ AB : AC（角を はさむ 2辺）'],
-  ['bsTap', 'ウチワケ', '📍', 'D は 辺 BC を AB : AC に 内分（6 : 4 ＝ 3 : 2 → B から 3目盛り）'],
+  ['bsTap', 'ウチワケ', '📍', 'D は 辺 BC を AB : AC に 内分（6 : 4 ＝ 3 : 2 → B から 3つめの 区切り）'],
   ['bsWhich', 'カクハサミ', '🧩', 'AB : AC ＝ BD : DC（BC 全体 では ない）'],
   ['exRatio', 'ソトニトウ', '🧭', '外角の 二等分線も BE : EC ＝ AB : AC（E は 外分）'],
   ['exPlace', 'ソトデル', '🚩', 'E は 短い ほうの 辺の がわの 外'],
@@ -771,16 +830,16 @@ const mk = (io, [m, n], o) => Object.assign({ io, m, n, st: 'A', rv: 0 }, o || {
 const GEN = {
   place: rng => { if (rng() < 0.12) return mk('in', [1, 1]); const io = ioOf(rng, 0.65); return mk(io, pairOf(rng, io)); },   // 1:1 は 内分だけ（1:1 の 外分は 出さない。10-31）
   tapIn: rng => mk('in', pairOf(rng, 'in'), rng() < 0.3 ? { st: 'B', rv: ri(rng, 0, 1) } : { rv: rng() < 0.2 ? 1 : 0 }),   // 線分BA も 3割（もとの 第4章 サカサマ）
-  readIn: rng => mk('in', pairOf(rng, 'in')),
   stepIn: rng => mk('in', pairOf(rng, 'in')),
   tapOut: rng => mk('out', pairOf(rng, 'out'), rng() < 0.3 ? { st: 'B', rv: ri(rng, 0, 1) } : { rv: rng() < 0.2 ? 1 : 0 }),
-  readOut: rng => mk('out', pairOf(rng, 'out')),
   stepOut: rng => mk('out', pairOf(rng, 'out')),
   placeST: rng => { const io = ioOf(rng, 0.75); return mk(io, pairOf(rng, io), { st: rng() < 0.7 ? 'B' : 'A', rv: ri(rng, 0, 1) }); },
   // まぼろし（3周目）：章で いちばん 手ごわい 判断を 2つ 重ねる
   mabPair: rng => mk('out', pairOf(rng, 'out'), { mode: 'pair' }),
-  mabTapIn: rng => mk('in', pairOf(rng, 'in', true), { mode: 'tapIn', k: 2 }),
-  mabTapOut: rng => mk('out', pairOf(rng, 'out', true), { mode: 'tapOut', k: 2 }),
+  masIn: (rng, slot) => masPrm(rng, 'in', slot),
+  masOut: (rng, slot) => masPrm(rng, 'out', slot),
+  mabMasIn: (rng, slot) => Object.assign(masPrm(rng, 'in', slot, true), { mode: 'masIn' }),
+  mabMasOut: (rng, slot) => Object.assign(masPrm(rng, 'out', slot, true), { mode: 'masOut' }),
   // 第4章・第5章：角の 二等分線
   bsRatio: rng => triPrm(...pick(rng, BS_TRI), 'in'),
   bsTap: rng => triPrm(...pick(rng, BS_TRI), 'in'),
@@ -791,7 +850,7 @@ const GEN = {
   mabBsLen: rng => Object.assign(triPrm(...pick(rng, BS_TRI), 'in'), { mode: 'bsLen' }),
   mabBoth: rng => Object.assign(triPrm(...pick(rng, EX_TRI), 'out'), { mode: 'exBoth' }),
 };
-function genPrm(form, rng) { const r = GEN[form](rng); return Object.assign({ mode: form }, r, { f: form, mode: r.mode || form }); }   // f ＝ 図鑑の 形
+function genPrm(form, rng, slot) { const r = GEN[form](rng, slot || {}); return Object.assign({ mode: form }, r, { f: form, mode: r.mode || form }); }   // f ＝ 図鑑の 形
 
 function build(prm, rng, opt = {}) {
   const q = prm, form = q.f || q.mode, lv = FORM_LV[form];
@@ -811,6 +870,24 @@ function build(prm, rng, opt = {}) {
   }
   p.reason = reasonLines(q);
   if (p.exam) p.reason.push('この 問題は 第' + lv + '章の「' + p.shortText + '」と おなじ');
+  const two = isMas(q) || ((q.mode === 'tapIn' || q.mode === 'tapOut') && !q.k);
+  if (two) {   // 連れ問：点を タップ（① どの 範囲 → ② 歩の 区切り）、マスヨミ（① 1歩は 何マス → ② AP は）
+    const q2 = Object.assign({}, q, { st2: 2 }), [s2, e2] = texts(q2), tapAns = { pos: nl(q).ans };
+    const s1 = { label: opt.boss ? '▼ 問題集の ことばで（①）' : p.label, display: p.display, reason: p.reason };
+    if (isMas(q)) Object.assign(s1, { options: p.options, answer: null });
+    else Object.assign(s1, { options: null, answer: { place: placeOf(q) }, noTicks: true });
+    const r2 = reasonLines(q2); if (opt.boss) r2.push('この 問題は 第' + lv + '章の「' + p.shortText + '」と おなじ');
+    const st2 = { label: opt.boss ? '▼ 問題集の ことばで（②）' : s2[0], display: opt.boss ? e2[0] : s2[1], reason: r2 };
+    if (isMas(q)) Object.assign(st2, { options: makeOptions(q2, rng), answer: null }); else Object.assign(st2, { options: null, answer: tapAns });
+    p.steps = [s1, st2];
+    useStep(p, 0);
+  }
+  return p;
+}
+function useStep(p, i) {
+  const st = p.steps[i];
+  Object.assign(p, { stepIdx: i, label: st.label, display: st.display, reason: st.reason, options: st.options || undefined, answer: st.answer || undefined, noTicks: !!st.noTicks, noneBtn: false });
+  p.long = p.display.length > 26;
   return p;
 }
 
@@ -851,19 +928,19 @@ function classify(p, ans) {
 const TYPE_TEXT = {
   inout: '内分は スタートと ゴールの 間、外分は 間では ない 所に 寄る', side: '外分は 歩数が 少ないほうの 外に 出る',
   ab: 'スタートと ゴールが 逆（先に 書いて ある 文字が スタート）', swap: '歩数が 逆（左の 数は スタートから 寄り道までの 歩数）',
-  count: '歩数の 数えかたが ちがう（スタートの 点は 数えずに、1歩ずつ 数える）', tick: '1目盛りを 1歩に した（1歩の 長さは A から B までの 歩数で 決める）',
-  whole: 'スタートから ゴールまで ぜんぶの 歩数を 使った（寄り道で 区切って 数える）', diff: '内分では A から B までは 歩数の 和',
+  count: '歩数の 数えかたが ちがう（スタートの 点は 数えずに、1歩ずつ 数える）', tick: '1マスを 1歩に した（1歩 ＝ {AB の マス数|A から B までの 歩数}）', flipM: '1歩 ＝ {マス|歩}（{歩|マス} では ない）',
+  diff: '内分では A から B までは 歩数の 和',
   sum: '外分では A から B までは 歩数の 差（もどる 歩を 引く）', pts: '点の 数では なく 歩の 数で 分ける', one: '片方の 歩数だけで 分けた',
   swapS: '順が 逆（BD : DC ＝ AB : AC。B の がわ どうし、C の がわ どうし）', side3: '二等分線で 分かれる 比は、角を はさむ 2辺 AB と AC の 比',
   wholeBC: 'BC 全体 では なく、D で 区切った DC', ratioF: 'BD : DC ＝ m : n なら BD は BC の {m|m ＋ n}（比を そのまま 分数に しない）',
-  countT: '目盛りの 数えかたが ちがう（AB : AC を 約分した 数で、B から 数える）', inBC: '内角の 二等分線は 辺 BC の 上（B と C の 間）で 交わる',
+  countT: '区切りの 数えかたが ちがう（AB : AC を 約分した 数で、B から 数える）', inBC: '内角の 二等分線は 辺 BC の 上（B と C の 間）で 交わる',
   inside: '外角の 二等分線は 辺 BC の 外で 交わる（内分 では なく 外分）', sideEx: '外分は 短い ほうの 辺の がわの 外に 出る（AB ＞ AC なら C より 外）',
   scatter: 'えらびかたが ばらばら',
 };
 const MASTER_TEXT = {
   inout: '内分と 外分', side: '外に 出る がわ', ab: 'スタートと ゴール', swap: '歩数の 順',
-  count: '歩数の 数えかた', tick: '1歩の 長さ', swapS: '比の 順', side3: '角を はさむ 2辺', wholeBC: '区切った 線分', ratioF: 'BC の 何分の何', countT: '目盛りの 数えかた',
-  inBC: '内角は 内分', inside: '外角は 外分', sideEx: '外に 出る がわ', whole: '寄り道で 区切る', diff: '内分の 歩数', sum: '外分の 歩数', pts: '歩の 数', one: '両方の 歩数',
+  count: '歩数の 数えかた', tick: '1歩の 長さ', flipM: '1歩の マス', swapS: '比の 順', side3: '角を はさむ 2辺', wholeBC: '区切った 線分', ratioF: 'BC の 何分の何', countT: '区切りの 数えかた',
+  inBC: '内角は 内分', inside: '外角は 外分', sideEx: '外に 出る がわ', diff: '内分の 歩数', sum: '外分の 歩数', pts: '歩の 数', one: '両方の 歩数',
 };
 function describe(p, cls) { return cls.types.map(t => (t === 'scatter' && p.options ? 'ちがう ものを えらんだ' : TYPE_TEXT[t])).join('、'); }
 function masterText(t) { return MASTER_TEXT[t]; }
@@ -904,15 +981,15 @@ function makeSlots(ch, rng, opt = {}) {
   const C = CHAPTERS[ch - 1], mid = [...Array(MID_HP).keys()].map(() => ({ lv: C.lv, boss: true }));
   if (C.final) return shuffle(rng, NORM_CH.map(c => c.lv)).map(lv => ({ lv, boss: true }));
   const play = opt.play === undefined ? ri(rng, 0, PLAYS - 1) : Math.min(opt.play, PLAYS - 1);
-  return C.plays[play].map(f => (f === 'MAB' ? { lv: C.lv, form: C.mab.form, mab: true } : { lv: C.lv, form: f, intro: !!(C.intro && opt.intro) })).concat(mid);
+  return C.plays[play].map(f => (f === 'MAB' ? { lv: C.lv, form: C.mab.form, mab: true, play } : { lv: C.lv, form: f, intro: !!(C.intro && opt.intro), play })).concat(mid.map(s => Object.assign(s, { play })));   // play：★の 回（マスの 問題の 割り切れる 割合）
 }
 function newContext() { return { recent: [], recentFig: [], weak: {}, log: [] }; }
-const figKey = prm => JSON.stringify([prm.m, prm.n, prm.io, prm.st]);   // 同じ 比・同じ 分けかたは 続けない
+const figKey = prm => JSON.stringify([prm.m, prm.n, prm.io, prm.st, prm.mode]);   // 同じ 比・同じ 分けかたは 続けない
 function makeProblem(slot, ctx, rng) {
   const w = ctx.weak[slot.lv];
   const forms = slot.form ? [slot.form] : CHAPTERS[slot.lv - 1].forms;
   const fresh = prm => !ctx.recentFig.includes(figKey(prm)) && !ctx.recent.includes(JSON.stringify(prm));
-  const gen = () => genPrm(pick(rng, forms), rng);
+  const gen = () => genPrm(pick(rng, forms), rng, slot);
   let prm = null, target = false;
   if (w) for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (likeOK(c, w.like, w.types) && fresh(c)) { prm = c; target = true; } }
   if (w) for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (likeOK(c, w.like, w.types) && !ctx.recent.includes(JSON.stringify(c))) { prm = c; target = true; } }   // 形が 少ない ときは 同じ 分けかたでも よい（AB ＝ AC など）
@@ -944,7 +1021,7 @@ function record(ctx, p, ok, cls, ms) {
 }
 
 G.NaibunCore = {
-  FIG, PAIRS, IN_PAIRS, OUT_PAIRS, MAB_IN, MAB_OUT, coordCs, nl, nlFx, nlAt, placeOf, coordAt, swapST, AREA, areaAt, areaFx, pairQ, TAP, INTRO, DATA_V, migrateProg, migrateZk,
+  FIG, PAIRS, IN_PAIRS, OUT_PAIRS, MAS_PAIRS, masP, masD, masPrm, isMas, useStep, fracStr, MAB_IN, MAB_OUT, coordCs, nl, nlFx, nlAt, placeOf, coordAt, swapST, AREA, areaAt, areaFx, pairQ, TAP, INTRO, DATA_V, migrateProg, migrateZk,
   BS_TRI, EX_TRI, EQ_TRI, TRI_MODES, isTri, triGeo, triPrm, triTapTypes, triPlaceTypes, PLAYS,
   CHAPTERS, NORM_CH, FORM_LV, MONSTERS, monsterOf, zukanAfter, zukanCount, GEN, genPrm, makeOptions, build, figKey, judge, classify, tapTypes,
   describe, masterText, likeOK, TYPE_TEXT, MASTER_TEXT, MID_HP, FINAL_HP, zakoHP, midHP, finalHP, CRIT, comboBonus, damage, makeSlots,
@@ -1178,6 +1255,7 @@ function draw() {
   const q = p();
   if (!q) return;
   if (q.tri) { drawTri(ctx, g, q); drawCaption(ctx, g, q); return; }
+  if (C.isMas(q.prm)) { drawMas(ctx, g, q); return; }
   const m = q.prm, L = C.nl(m), X = t => C.nlFx(L, t) * g.W, vk = viewKind(), rev = state.reveal;
   const px = X(L.lo + 1) - X(L.lo), h = Math.min(g.H * 0.13, px * L.k * 0.42);   // 1歩の 弧の 高さ
   const letY = g.y - Math.max(h * 1.1 + 14 * d, 22 * d);
@@ -1191,7 +1269,7 @@ function draw() {
   seg(ctx, g, 0.015 * g.W, g.y, 0.985 * g.W, g.y, '#fff', 2);
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(0.985 * g.W + 2 * d, g.y); ctx.lineTo(0.985 * g.W - 7 * d, g.y - 4 * d); ctx.lineTo(0.985 * g.W - 7 * d, g.y + 4 * d); ctx.closePath(); ctx.fill();
   // 目盛り
-  if (TICK_MODES.includes(m.mode) || rev) for (let t = L.lo; t <= L.hi; t++) seg(ctx, g, X(t), g.y - 6 * d, X(t), g.y + 6 * d, GRAY, 1.4);
+  if ((TICK_MODES.includes(m.mode) || rev) && !q.noTicks) for (let t = L.lo; t <= L.hi; t++) seg(ctx, g, X(t), g.y - 6 * d, X(t), g.y + 6 * d, GRAY, 1.4);   // 見当（①）の ときは 区切りを 出さない
   // チュートリアル：押す 目盛りを 光らせる
   if (state.tut && state.tut.step === 'tap' && state.blinkOn && L.ans !== null && !isArea(q)) dotAt(ctx, g, X(L.ans), HINT_COL, 14);
   // 場所を えらぶ 形：えらんだ 場所（青）・正しい 場所（きいろ）を 数直線の 上に 太い 線で（三角不等式の 弧と 同じ）
@@ -1209,7 +1287,7 @@ function draw() {
   if (showAns && m.mode === 'pair') {
     const Q = C.nl(Object.assign({}, m, { m: m.n, n: m.m }));
     [[L.ans, 'P'], [Q.ans, 'Q']].forEach(([t, s]) => { dotAt(ctx, g, X(t), YEL, 7); textAt(ctx, g, s, pX(t), letY, YEL, 'center', 15); });
-  } else if (showAns) {
+  } else if (showAns && !q.noTicks) {
     const P = L.none ? L.S - L.dir * m.m * L.k : L.ans, toP = Math.sign(P - L.S), back = L.none ? L.S : L.E, toE = Math.sign(back - P);
     for (let i = 0; i < m.m; i++) hop(ctx, g, X(L.S + toP * i * L.k), X(L.S + toP * (i + 1) * L.k), true, ORANGE, h);
     for (let i = 0; i < m.n; i++) hop(ctx, g, X(P + toE * i * L.k), X(P + toE * (i + 1) * L.k), false, BLUE2, h);
@@ -1304,6 +1382,27 @@ function drawTri(ctx, g, q) {
   dotAt(ctx, Object.assign({}, g, { y: ay }), ax, '#fff', 4.5); textAt(ctx, g, 'A', ax, ay - 14 * d, '#fff', 'center', 15);
   [['B', xB], ['C', xC]].forEach(([t, x]) => { dotAt(ctx, Object.assign({}, g, { y: y0 }), x, '#fff', 4.5); textAt(ctx, g, t, x + (t === 'B' ? -1 : 1) * 10 * d, y0 + 15 * d, '#fff', 'center', 15); });
 }
+// ---------- マスの 図（マスヨミ・ソトマス）：目盛りは 1マス（長さ）。答えの あと 1歩（＝ {マス|歩}）の 弧と P ----------
+function drawMas(ctx, g, q) {
+  const m = q.prm, W = g.W, H = g.H, d = g.d, D = C.masD(m), Pd = C.masP(m), lo = Math.min(0, Pd) - 1, hi = Math.max(m.L, Pd) + 1;
+  const X = t => (C.FIG.L + (t - lo) / (hi - lo) * (C.FIG.R - C.FIG.L)) * W, y = g.y, showAns = viewKind() === 'ans' && state.reveal;
+  seg(ctx, g, 0.015 * W, y, 0.985 * W, y, '#fff', 2);
+  for (let t = Math.ceil(lo); t <= Math.floor(hi); t++) seg(ctx, g, X(t), y - 6 * d, X(t), y + 6 * d, GRAY, 1.4);
+  const sp = (m.L / D), h = Math.min(H * 0.13, (X(sp) - X(0)) * 0.42), letY = y - Math.max(h * 1.1 + 14 * d, 22 * d);
+  if (showAns) {   // 1歩 ＝ {マス|歩}：A から P（オレンジ、上）、P から B（青、下）
+    const s = Pd < 0 ? -1 : 1;
+    for (let i = 0; i < m.m; i++) hop(ctx, g, X(s * i * sp), X(s * (i + 1) * sp), true, ORANGE, h);
+    const toB = Math.sign(m.L - Pd);
+    for (let i = 0; i < m.n; i++) hop(ctx, g, X(Pd + toB * i * sp), X(Pd + toB * (i + 1) * sp), false, BLUE2, h);
+    dotAt(ctx, g, X(Pd), YEL, 7); textAt(ctx, g, 'P', X(Pd), letY, YEL, 'center', 15);
+    textAt(ctx, g, m.L % D ? m.L + 'マスを ' + D + '歩に 分ける' : '1歩 ＝ ' + m.L / D + ' マス', 6 * d, 11 * d, ORANGE, 'left', g.W < 260 * d ? 11 : 13);   // 図の 中は 分数を 組めないので ことばで
+  }
+  [['A', 0], ['B', m.L]].forEach(([s, t]) => { dotAt(ctx, g, X(t), '#fff', 5.5); textAt(ctx, g, m.a ? s + '(' + String(m.a + t).replace('-', '−') + ')' : s, X(t), letY, '#fff', 'center', 15); });
+  if (!m.a) {   // AB の 長さ（マス）
+    const yb = y + 22 * d; seg(ctx, g, X(0), yb, X(m.L), yb, CYAN, 1.4); seg(ctx, g, X(0), yb - 5 * d, X(0), yb + 5 * d, CYAN, 1.4); seg(ctx, g, X(m.L), yb - 5 * d, X(m.L), yb + 5 * d, CYAN, 1.4);
+    textAt(ctx, g, m.L + ' マス', (X(0) + X(m.L)) / 2, yb + 13 * d, CYAN, 'center', 12);
+  }
+}
 function drawCaption(ctx, g, q) {   // ミスの あと：いま どちらの 図か（右上）
   if (!(state.phase === 'next' && tapMode(q) && !state.tut)) return;
   const vk = viewKind(), cap = vk === 'mine' ? 'じぶんの こたえ' : 'ただしい ず';
@@ -1346,7 +1445,7 @@ function showMaru(text, gold) {   // 正解の 大きい まる
 function showLevelUp() { const el = document.createElement('div'); el.className = 'level-up'; el.textContent = 'LEVEL UP!'; gameEl.appendChild(el); setTimeout(() => el.remove(), 1800); }
 
 // ---------- 進行 ----------
-function hint() { const q = p(); if (q.tri && !q.options) return isArea(q) ? 'E の ある 範囲を 直線 BC で タップ → けってい' : '直線 BC の 目盛りを タップ → けってい'; return q.options ? 'えらんで けってい' : isArea(q) ? (q.mode === 'pair' ? '点 Q の ある 範囲を 数直線で タップ → けってい' : '寄り道の ある 範囲を 数直線で タップ → けってい') : '数直線の 目盛りを タップ → けってい'; }
+function hint() { const q = p(); if (q.tri && !q.options) return isArea(q) ? 'E の ある 範囲を 直線 BC で タップ → けってい' : '直線 BC の 区切りを タップ → けってい'; return q.options ? 'えらんで けってい' : isArea(q) ? (q.mode === 'pair' ? '点 Q の ある 範囲を 数直線で タップ → けってい' : '寄り道の ある 範囲を 数直線で タップ → けってい') : '数直線の 区切りを タップ → けってい'; }
 function resetInput() { state.sel = { pos: null, place: null }; state.opt = -1; state.reveal = false; state.view = 'ans'; }
 function newProblem() {
   if (state.slotIdx >= state.slots.length) {   // ボスは HP が のこる かぎり 出す
@@ -1354,7 +1453,7 @@ function newProblem() {
     state.slots.push({ lv, boss: true });
   }
   state.problem = C.makeProblem(state.slots[state.slotIdx], state.ctx, rng);
-  resetInput();
+  resetInput(); state.stepFail = null;
   state.phase = 'play';
   state.shownAt = performance.now();
   renderEnemy(); renderProblem(); renderControls(); renderStatus(); draw();
@@ -1366,8 +1465,41 @@ function submit() {
   if (state.tut) { tutDecide(); return; }
   if (!ready()) { setMessage(hint()); return; }
   const ans = answerNow(), ok = C.judge(q, ans), cls = ok ? null : C.classify(q, ans);
+  if (q.steps && q.stepIdx === 0) { stepOne(ok, cls); return; }   // 連れ問の ①
+  if (q.steps && state.stepFail) { afterStepFail(ok); return; }   // ① を まちがえた あとの ②
   const ev = C.record(state.ctx, q, ok, cls, Math.round(performance.now() - state.shownAt));
   if (ok) onCorrect(ev); else onWrong(cls);
+}
+// 連れ問：① が せいかいなら そのまま ② へ。① を まちがえたら ライフを 1つ へらし、ただしい ① を 見せて ② へ
+function goStep2(msg) {
+  C.useStep(p(), 1); resetInput();
+  state.phase = 'play'; renderProblem(); renderControls(); draw(); setMessage(msg + '\n' + hint());
+}
+function stepOne(ok, cls) {
+  const q = p();
+  state.reveal = true;
+  if (ok) {
+    state.phase = 'busy'; draw(); renderControls(); flashScreen(); showMaru('① せいかい！');
+    setMessage('① せいかい！　つぎは ②');
+    setTimeout(() => goStep2('つぎは ②'), 900);
+    return;
+  }
+  state.stepFail = cls; state.combo = 0;
+  if (atBoss()) state.bossMiss = true;
+  if (q.mab) state.mabMiss = true;
+  state.lives -= 1; state.phase = 'next'; state.view = 'ans';
+  draw(); renderControls(); renderStatus();
+  monsterAnim('miss-dmg'); showDamage('MISS', '#ff4444');
+  setMessage(['ざんねん！　' + C.describe(q, cls), 'ただしい こたえは こう（きいろ・みどり）', ...q.reason].join('\n'));
+  state.onNext = state.lives <= 0 ? () => { state.phase = 'idle'; $('gameOverScreen').classList.remove('hidden'); } : () => goStep2('② は ただしい ① で 考えよう');
+}
+function afterStepFail(ok) {   // ① を まちがえた 問題は ② が できても たおせない（もう一度）
+  const q = p(), cls = ok ? state.stepFail : C.classify(q, answerNow());
+  C.record(state.ctx, q, false, state.stepFail, Math.round(performance.now() - state.shownAt));
+  state.phase = 'next'; state.reveal = true; state.view = 'ans';
+  draw(); renderControls(); renderStatus();
+  setMessage((ok ? ['② は せいかい！', 'でも ① を まちがえたので、もう一度'] : ['ざんねん！　' + C.describe(q, cls), ...q.reason]).join('\n'));
+  state.onNext = () => { newProblem(); setMessage('もういちど！\n' + hint()); };
 }
 function onCorrect(ev) {
   const c = chap(), boss = atBoss(), e = enemyNow(), q = p();
@@ -1544,9 +1676,9 @@ const TUT = [
   { prm: { mode: 'place', io: 'in', m: 2, n: 1, st: 'A', rv: 0 },
     msg: '【れんしゅう 1/3】2:1 は スタート A から 寄り道まで 2歩、寄り道から ゴール B まで 1歩。\n内分は スタートと ゴールの 間に 寄る。数直線の A と B の 間を タップしよう',
     wrongTap: '内分は スタートと ゴールの 間に 寄るよ。点滅して いる ところ（A と B の 間）を タップしてね' },
-  { prm: { mode: 'tapIn', io: 'in', m: 2, n: 1, st: 'A', rv: 0 },
-    msg: '【れんしゅう 2/3】1目盛り ＝ 1歩。A から 2歩 進んだ 目盛りを タップしよう（そこから 1歩で ちょうど B）',
-    wrongTap: 'そこじゃないよ。点滅して いる 目盛り（A から 2歩）を タップしてね' },
+  { prm: { mode: 'tapIn', io: 'in', m: 2, n: 1, st: 'A', rv: 0, k: 1 },   // れんしゅうは 区切りを タップ する だけ（連れ問に しない）
+    msg: '【れんしゅう 2/3】区切りは 1歩。A から 2歩 進んだ 区切りを タップしよう（そこから 1歩で ちょうど B）',
+    wrongTap: 'そこじゃないよ。点滅して いる 区切り（A から 2歩）を タップしてね' },
   { prm: { mode: 'place', io: 'out', m: 1, n: 3, st: 'A', rv: 0 },
     msg: '【れんしゅう 3/3】外分は 間では ない 所に 寄る。1:3 は A まで 1歩、B まで 3歩。\n歩数が 少ないのは A → 寄り道は A より 左。点滅して いる ところを タップしよう',
     wrongTap: '歩数が 少ないのは A（1歩）。寄り道は A より 左だよ。点滅して いる ところを タップしてね' },
