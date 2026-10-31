@@ -384,7 +384,7 @@ padding: 14px 0; text-shadow: 3px 3px 0 #400; animation: warn 2s forwards;
       <div>・数直線の 目盛りは、ことわりが なければ <b>1目盛り ＝ 1歩</b></div>
       <div>・A・B は 線分の 2つの 点、<b>P</b> は 寄り道の 点</div>
       <div>・図の <b style="color:#ff9f43">オレンジ</b>は スタートから 寄り道までの 歩、<b style="color:#4f8dff">青</b>は 寄り道から ゴールまでの 歩</div>
-      <div>・計算は しない。どこに 出るか・何歩かを 決める</div>
+      <div>・計算は しない。どの 範囲に 出るか・何歩かを 決める</div>
       <div>・三角形の 図：直線 BC の 目盛りも 1目盛り ＝ 1歩。辺の 数字は 長さ</div>
     </div>
     <button class="how-btn" id="ruleDef">📐 内分・外分と 二等分線の 約束</button>
@@ -632,12 +632,12 @@ function makeOptions(q, rng) {
 function texts(q) {
   const s = segStr(q), r = ratioStr(q), io = IO_JP[q.io];
   const T = {
-    place: () => [['▼ どこに 出る？', s + ' を ' + r + ' に ' + io + 'する 点は どこ？'], [s + ' を ' + r + ' に ' + io + 'する 点 P の ある 場所を、図で 選べ。']],
+    place: () => [['▼ どの 範囲？', s + ' を ' + r + ' に ' + io + 'する 点は どの 範囲に ある？'], [s + ' を ' + r + ' に ' + io + 'する 点 P は どの 範囲に あるか、図で 選べ。']],   // 「どこ」だと 1点を 指そうと するので「どの 範囲」（10-31 先生）
     tapIn: () => [['▼ 点を タップ', s + ' を ' + r + ' に ' + io + 'する 点を タップ'], [s + ' を ' + r + ' に ' + io + 'する 点 P を 図示せよ。']],
     readIn: () => [['▼ 比を 読む', '図の 点 P は ' + s + ' を どんな 比に ' + io + 'する？'], ['図の 点 P は、' + s + ' を どのような 比に ' + io + 'するか。']],
     stepIn: () => [['▼ 1歩の 長さ', s + ' を ' + r + ' に ' + io + '。1歩は AB の どれだけ？'], [s + ' を ' + r + ' に ' + io + 'する 点を、AB を 等分して とる。1目盛りの 長さは AB の 何倍か。']],
-    pair: () => [['▼ 2つの 外分', '図の P は 線分AB を ' + q.m + ':' + q.n + ' に 外分する 点。' + q.n + ':' + q.m + ' に 外分する 点 Q は どこ？'],
-      ['図の 点 P は 線分AB を ' + q.m + ':' + q.n + ' に 外分する 点で ある。' + q.n + ':' + q.m + ' に 外分する 点 Q の ある 場所を、図で 選べ。']],
+    pair: () => [['▼ 2つの 外分', '図の P は 線分AB を ' + q.m + ':' + q.n + ' に 外分する 点。' + q.n + ':' + q.m + ' に 外分する 点 Q は どの 範囲に ある？'],
+      ['図の 点 P は 線分AB を ' + q.m + ':' + q.n + ' に 外分する 点で ある。' + q.n + ':' + q.m + ' に 外分する 点 Q は どの 範囲に あるか、図で 選べ。']],
     coord: () => { const L = nl(q), A = 'A(' + num(coordAt(q, L.A)) + ')', B = 'B(' + num(coordAt(q, L.B)) + ')';
       return [['▼ 座標は？', '2点 ' + A + '、' + B + ' で、' + s + ' を ' + r + ' に ' + io + 'する 点の 座標は？'], ['数直線 上の 2点 ' + A + '、' + B + ' に ついて、' + s + ' を ' + r + ' に ' + io + 'する 点の 座標を 求めよ。']]; },
   };
@@ -654,7 +654,7 @@ function triTexts(q) {
     bsWhich: () => [['▼ □ に 入るのは？', 'AD は ∠A の 二等分線。AB : AC ＝ BD : □'], ['△ABC で、' + inD + 'AB : AC ＝ BD : □ の □ に 入る 線分を 答えよ。']],
     bsLen: () => [['▼ BD は BC の？', 'AD は ∠A の 二等分線、BC ＝ ' + q.a + '。BD は BC の 何分の何？'], [tri + 'BC ＝ ' + q.a + ' の とき、' + inD + 'BD は BC の 何倍か。']],
     exRatio: () => [['▼ 比は どれ？', 'AE は ∠A の 外角の 二等分線。BE : EC ＝ ？'], [tri + exE + 'BE : EC は どの 2辺の 比に 等しいか。']],
-    exPlace: () => [['▼ E は どこ？', 'AE は ∠A の 外角の 二等分線。E は どこ？'], [tri + exE + '点 E の ある 場所を、図で 選べ。']],
+    exPlace: () => [['▼ どの 範囲？', 'AE は ∠A の 外角の 二等分線。E は どの 範囲に ある？'], [tri + exE + '点 E は どの 範囲に あるか、図で 選べ。']],
     exTap: () => [['▼ E を タップ', 'AE は ∠A の 外角の 二等分線。E の 場所を タップ'], [tri + exE + '点 E の 位置を 図示せよ。']],
     exBoth: () => [['▼ 内角と 外角', 'AD は ∠A の、AE は ∠A の 外角の 二等分線。BD : DC と BE : EC は？'], ['△ABC で、' + inD + exE + 'BD : DC と BE : EC は、それぞれ どの 2辺の 比に 等しいか。']],
   };
@@ -704,7 +704,7 @@ function reasonLines(q) {
 // ---------- 問題の 形（＝ モンスター）と 章 ----------
 const TAP = ['tapIn', 'tapOut', 'bsTap', 'exTap'];   // 目盛りを タップして 答える
 const CHAPTERS = [
-  { ch: 1, lv: 1, title: '第1章 どこに 出る？', forms: ['place', 'placeST'], plays: [['place', 'placeST'], ['placeST', 'place'], ['place', 'MAB']], intro: true,
+  { ch: 1, lv: 1, title: '第1章 どの 範囲に ある？', forms: ['place', 'placeST'], plays: [['place', 'placeST'], ['placeST', 'place'], ['place', 'MAB']], intro: true,
     mab: { form: 'mabPair', name: 'カガミヨリ', sprite: '🪞', tip: 'm:n と n:m の 外分は、反対がわの 外に 出る' },
     boss: { name: 'ヨリミチオウ', sprite: '🏰' } },
   { ch: 2, lv: 2, title: '第2章 内分の 点', forms: ['tapIn', 'readIn', 'stepIn'], plays: [['tapIn', 'readIn'], ['stepIn', 'tapIn'], ['readIn', 'MAB']],
@@ -1253,7 +1253,7 @@ function drawTri(ctx, g, q) {
   seg(ctx, g, xB, y0, xC, y0, '#fff', 2.4);
   if (TICK_MODES.includes(m.mode) || rev) for (let t = L.lo; t <= L.hi; t++) seg(ctx, g, X(t), y0 - 6 * d, X(t), y0 + 6 * d, GRAY, 1.4);
   if (state.tut && state.tut.step === 'tap' && state.blinkOn && L.ans !== null && !isArea(q)) { ctx.beginPath(); ctx.arc(X(L.ans), y0, 14 * d, 0, Math.PI * 2); ctx.fillStyle = HINT_COL; ctx.fill(); }
-  // 場所を えらぶ（E は どこ？）：えらんだ 場所（青）・正しい 場所（きいろ）
+  // 範囲を えらぶ（E は どの 範囲に ある？）：えらんだ 場所（青）・正しい 場所（きいろ）
   if (isArea(q)) {
     const leftKey = 'outA', span = key => (key === 'mid' ? [xB, xC] : key === leftKey ? [0.015 * W, xB] : [xC, 0.985 * W - 8 * d]);
     const band = (key, col, w) => { if (!key || key === 'none') return; const [x0, x1] = span(key); ctx.lineCap = 'round'; seg(ctx, g, x0, y0, x1, y0, col, w); ctx.lineCap = 'butt'; };
@@ -1346,7 +1346,7 @@ function showMaru(text, gold) {   // 正解の 大きい まる
 function showLevelUp() { const el = document.createElement('div'); el.className = 'level-up'; el.textContent = 'LEVEL UP!'; gameEl.appendChild(el); setTimeout(() => el.remove(), 1800); }
 
 // ---------- 進行 ----------
-function hint() { const q = p(); if (q.tri && !q.options) return isArea(q) ? 'E の ある 場所を 直線 BC で タップ → けってい' : '直線 BC の 目盛りを タップ → けってい'; return q.options ? 'えらんで けってい' : isArea(q) ? (q.noneBtn ? '寄り道の ある 場所を 数直線で タップ（点が ない ときは「点は ない」）→ けってい' : '点 Q の ある 場所を 数直線で タップ → けってい') : '数直線の 目盛りを タップ → けってい'; }
+function hint() { const q = p(); if (q.tri && !q.options) return isArea(q) ? 'E の ある 範囲を 直線 BC で タップ → けってい' : '直線 BC の 目盛りを タップ → けってい'; return q.options ? 'えらんで けってい' : isArea(q) ? (q.mode === 'pair' ? '点 Q の ある 範囲を 数直線で タップ → けってい' : '寄り道の ある 範囲を 数直線で タップ → けってい') : '数直線の 目盛りを タップ → けってい'; }
 function resetInput() { state.sel = { pos: null, place: null }; state.opt = -1; state.reveal = false; state.view = 'ans'; }
 function newProblem() {
   if (state.slotIdx >= state.slots.length) {   // ボスは HP が のこる かぎり 出す
