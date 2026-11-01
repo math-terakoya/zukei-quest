@@ -550,10 +550,15 @@ function placeOf(q) {   // 'mid'（A と B の 間）・'outA'・'outB'・'none'
 // 三角形 ABC：AB ＝ c、AC ＝ b、BC ＝ a。D（内角）・E（外角）は 辺 BC を c:b（約分して m:n）に 内分・外分する。
 // 直線 BC は 数直線と 同じ しくみ（nl）：B が 目盛り A の 位置、C が 目盛り B の 位置（io・m・n を 同じ 形で 持つ）
 const BS_TRI = [[6, 4], [4, 6], [6, 3], [3, 6], [5, 3], [3, 5], [8, 6], [6, 8], [4, 5], [5, 4], [6, 2], [2, 6]];
-const EX_TRI = [[6, 3], [3, 6], [6, 4], [4, 6], [5, 3], [3, 5], [6, 2], [2, 6], [5, 2], [2, 5], [8, 2], [2, 8]];
-const EQ_TRI = [];   // AB ＝ AC（外角の 二等分線が BC と 平行で 点 E が ない）は 出さない（初学者には きつい。10-31）
-const TRI_MODES = ['bsRatio', 'bsTap', 'bsWhich', 'bsLen', 'exRatio', 'exPlace', 'exTap', 'exBoth'];
-function triPrm(c, b, io) {   // BC は AB・AC と ちがう 長さで、AB : AC・AC : AB・AB : BC・AC : BC が みな ちがう 値に なる もの（はずれが 正解と 同じ 値に ならない）
+const EX_TRI = [[6, 3], [3, 6], [6, 2], [2, 6], [5, 2], [2, 5], [8, 2], [2, 8]];   // E が 遠く なりすぎない 比（6:4・5:3 は E が 遠く、三角形が 小さく なるので 出さない。11-01）
+const EQ_TRI = [];
+const MID_EQ = [[4, 4], [5, 5], [6, 6]];   // 中点より どっち？：AB ＝ AC は ちょうど 中点（1:1 の 内分は よい）   // AB ＝ AC（外角の 二等分線が BC と 平行で 点 E が ない）は 出さない（初学者には きつい。10-31）
+const TRI_MODES = ['bsRatio', 'bsMid', 'bsWhich', 'bsLen', 'exRatio', 'exPlace', 'exTap', 'exBoth'];
+function triPrm(c, b, io) {
+  if (c === b) return { c, b, a: Math.round(0.7 * (c + b)) - 1, m: 1, n: 1, io, st: 'A', rv: 0 };   // AB ＝ AC（中点の 問題だけ）
+  return triPrm0(c, b, io);
+}
+function triPrm0(c, b, io) {   // BC は AB・AC と ちがう 長さで、AB : AC・AC : AB・AB : BC・AC : BC が みな ちがう 値に なる もの（はずれが 正解と 同じ 値に ならない）
   const AD = a => Math.sqrt(b * c * (1 - (a * a) / ((b + c) * (b + c))));   // 内角の 二等分線の 長さ（AD が DC・BD と 同じに なると 「□ に 入るのは？」の はずれが 正解に なる）
   const g = gcd(c, b), ok = a => a > Math.abs(c - b) && a < c + b && new Set([c / b, b / c, c / a, b / a].map(v => v.toFixed(9))).size === 4
     && Math.abs(AD(a) - a * b / (b + c)) > 1e-6 && Math.abs(AD(a) - a * c / (b + c)) > 1e-6;
@@ -648,7 +653,8 @@ function makeOptions(q, rng) {
     if (alt > 0) add(E(fracStr(q.L, alt), m, sg, q.a) + (q.a ? '' : ' マス'), V(q.L / alt, m, sg, q.a), [q.io === 'in' ? 'diff' : 'sum']);
   }
   if (mode === 'bsRatio' || mode === 'exRatio') {   // BD : DC（BE : EC）は どの 辺の 比？
-    add('AB : AC', 'r', []); add('AC : AB', 's', ['swapS']); add('AB : BC', 't', ['side3']); add('AC : BC', 'u', ['side3']);
+    const c = q.c, b = q.b, a = q.a;   // 比は 辺の 長さの まま（約分 しない。文字の AB : AC と そろえる。11-01 先生）
+    add(c + ' : ' + b, 'r', []); add(b + ' : ' + c, 's', ['swapS']); add(c + ' : ' + a, 't', ['side3']); add(b + ' : ' + a, 'u', ['side3']);
   }
   if (mode === 'bsWhich') { add('DC', 'r', []); add('BC', 'w', ['wholeBC']); add('AD', 'a', ['side3']); }
   if (mode === 'bsLen') {   // BD は BC の 何分の何
@@ -657,8 +663,15 @@ function makeOptions(q, rng) {
   }
   if (mode === 'exBoth') {   // 内角と 外角の 両方
     fixed = false;
-    add('どちらも AB : AC', 'r', []); add('D は AB : AC、E は AC : AB', 's', ['swapS']);
-    add('どちらも AC : AB', 't', ['swapS']); add('D は AB : AC、E は AB : BC', 'u', ['side3']);
+    const c = q.c, b = q.b, a = q.a;
+    add('どちらも ' + c + ' : ' + b, 'r', []); add('D は ' + c + ' : ' + b + '、E は ' + b + ' : ' + c, 's', ['swapS']);
+    add('どちらも ' + b + ' : ' + c, 't', ['swapS']); add('D は ' + c + ' : ' + b + '、E は ' + c + ' : ' + a, 'u', ['side3']);
+  }
+  if (mode === 'bsMid') {   // D は BC の 中点より どっち？（短い ほうの 辺の がわに 寄る）
+    fixed = true;
+    const right = q.c === q.b ? 'm' : q.c < q.b ? 'b' : 'c';
+    const ty = k => (k === right ? [] : right === 'm' ? ['midNot'] : k === 'm' ? ['midEq'] : ['midSide']);
+    add('中点より B 側', 'b', ty('b')); add('ちょうど 中点', 'm', ty('m')); add('中点より C 側', 'c', ty('c'));
   }
   const seen = new Set(), out = [];
   for (const x of c) { if (seen.has(x.key)) continue; seen.add(x.key); out.push(x); if (out.length === 4) break; }
@@ -700,14 +713,14 @@ function triTexts(q) {
   const tri = '△ABC で、AB ＝ ' + q.c + '、AC ＝ ' + q.b + ' と する。';
   const inD = '∠A の 二等分線と 辺 BC の 交点を D と する。', exE = '∠A の 外角の 二等分線と 直線 BC の 交点を E と する。';
   const T = {
-    bsRatio: () => [['▼ 比は どれ？', 'AD は ∠A の 二等分線。BD : DC ＝ ？'], [tri + inD + 'BD : DC は どの 2辺の 比に 等しいか。']],
-    bsTap: () => [['▼ D を タップ', 'AD は ∠A の 二等分線。D の 場所を タップ'], [tri + inD + '点 D の 位置を 図示せよ。']],
+    bsRatio: () => [['▼ BD : DC は？', 'AD は ∠A の 二等分線。BD : DC ＝ ？'], [tri + inD + 'BD : DC を 求めよ。']],
+    bsMid: () => [['▼ 中点より どっち？', 'AD は ∠A の 二等分線。D は BC の 中点 M より どっち？'], [tri + inD + '点 D は 辺 BC の 中点 M に 対して B、C の どちらの 側に あるか。']],
     bsWhich: () => [['▼ □ に 入るのは？', 'AD は ∠A の 二等分線。AB : AC ＝ BD : □'], ['△ABC で、' + inD + 'AB : AC ＝ BD : □ の □ に 入る 線分を 答えよ。']],
     bsLen: () => [['▼ BD は BC の？', 'AD は ∠A の 二等分線、BC ＝ ' + q.a + '。BD は BC の 何分の何？'], [tri + 'BC ＝ ' + q.a + ' の とき、' + inD + 'BD は BC の 何倍か。']],
-    exRatio: () => [['▼ 比は どれ？', 'AE は ∠A の 外角の 二等分線。BE : EC ＝ ？'], [tri + exE + 'BE : EC は どの 2辺の 比に 等しいか。']],
+    exRatio: () => [['▼ BE : EC は？', 'AE は ∠A の 外角の 二等分線。BE : EC ＝ ？'], [tri + exE + 'BE : EC を 求めよ。']],
     exPlace: () => [['▼ どの 範囲？', 'AE は ∠A の 外角の 二等分線。E は どの 範囲に ある？'], [tri + exE + '点 E は どの 範囲に あるか、図で 選べ。']],
     exTap: () => [['▼ E を タップ', 'AE は ∠A の 外角の 二等分線。E の 場所を タップ'], [tri + exE + '点 E の 位置を 図示せよ。']],
-    exBoth: () => [['▼ 内角と 外角', 'AD は ∠A の、AE は ∠A の 外角の 二等分線。BD : DC と BE : EC は？'], ['△ABC で、' + inD + exE + 'BD : DC と BE : EC は、それぞれ どの 2辺の 比に 等しいか。']],
+    exBoth: () => [['▼ 内角と 外角', 'AD は ∠A の、AE は ∠A の 外角の 二等分線。BD : DC と BE : EC は？'], [tri + inD + exE + 'BD : DC と BE : EC を 求めよ。']],
   };
   return T[q.mode]();
 }
@@ -716,9 +729,15 @@ function triTexts(q) {
 const sideW = (q, X) => { const L = nl(q), x = X === 'A' ? L.A : L.B, y = X === 'A' ? L.B : L.A; return x < y ? '左' : '右'; };   // 図で X が B（A）より 左か 右か → 外は その がわ
 function triReason(q) {
   const out = [], add = s => out.push(s), X = PT(q), m = q.m, n = q.n;
-  if (q.mode === 'exBoth') { add('内角の 二等分線：BD : DC ＝ AB : AC（D は BC を 内分）'); add('外角の 二等分線：BE : EC ＝ AB : AC（E は BC を 外分）'); add('どちらも 角を はさむ 2辺 AB : AC'); return out; }
+  if (q.mode === 'exBoth') { add('内角の 二等分線：BD : DC ＝ AB : AC（D は BC を 内分）'); add('外角の 二等分線：BE : EC ＝ AB : AC（E は BC を 外分）'); add('どちらも AB : AC ＝ ' + q.c + ' : ' + q.b); return out; }
   add(q.io === 'in' ? '∠A の 二等分線 → BD : DC ＝ AB : AC（D は 辺 BC を 内分）' : '∠A の 外角の 二等分線 → BE : EC ＝ AB : AC（E は 辺 BC を 外分）');
   if (q.io === 'out' && m === n) { add('AB ＝ AC → 外角の 二等分線は BC と 平行 → 直線 BC と 交わらない → 点 E は ない'); return out; }
+  if (q.mode === 'bsMid') {
+    add('BD : DC ＝ AB : AC ＝ ' + q.c + ' : ' + q.b + (q.c === q.b ? ' → BD ＝ DC → ちょうど 中点' : ' → ' + (q.c < q.b ? 'BD の 方が 短い（AB が 短い）→ 中点より B 側' : 'DC の 方が 短い（AC が 短い）→ 中点より C 側')));
+    add('D は 短い ほうの 辺の がわに 寄る');
+    return out;
+  }
+  if (['bsRatio', 'exRatio'].includes(q.mode)) { add((q.io === 'in' ? 'BD : DC' : 'BE : EC') + ' ＝ AB : AC ＝ ' + q.c + ' : ' + q.b + '（辺の 長さの まま）'); return out; }
   add('AB : AC ＝ ' + q.c + ' : ' + q.b + (q.c / m !== 1 ? ' ＝ ' + m + ' : ' + n : '') + ' → B から ' + X + ' まで ' + m + '、' + X + ' から C まで ' + n);
   if (q.io === 'out') add('外分 → 短い ほうの 辺の がわの 外に 出る：' + (m > n ? 'AC が 短い → C より 右' : 'AB が 短い → B より 左'));
   if (q.mode === 'bsLen') add('BD ＝ BC の {' + m + '|' + (m + n) + '}（BC を ' + (m + n) + ' 等分した ' + m + 'つ分）');
@@ -761,7 +780,7 @@ function reasonLines(q) {
 }
 
 // ---------- 問題の 形（＝ モンスター）と 章 ----------
-const TAP = ['tapIn', 'tapOut', 'bsTap', 'exTap'];   // 目盛りを タップして 答える
+const TAP = ['tapIn', 'tapOut', 'exTap'];   // 目盛りを タップして 答える
 const CHAPTERS = [
   { ch: 1, lv: 1, title: '第1章 どの 範囲に ある？', forms: ['place', 'placeST'], plays: [['place', 'placeST'], ['placeST', 'place'], ['place', 'MAB']], intro: true,
     mab: { form: 'mabPair', name: 'カガミヨリ', sprite: '🪞', tip: 'm:n と n:m の 外分は、反対がわの 外に 出る' },
@@ -772,7 +791,7 @@ const CHAPTERS = [
   { ch: 3, lv: 3, title: '第3章 外分の 点', forms: ['tapOut', 'stepOut', 'masOut'], plays: [['tapOut', 'stepOut'], ['masOut', 'tapOut'], ['masOut', 'MAB']],
     mab: { form: 'mabMasOut', name: 'トオマワリ', sprite: '🌪️', tip: '外分の 座標：1歩 ＝ {マス|歩}（歩は 多いほう − 少ないほう）。外へ 出る 向きに 注意' },
     boss: { name: 'ガイブンオウ', sprite: '🏯' } },
-  { ch: 4, lv: 4, title: '第4章 内角の 二等分線', forms: ['bsRatio', 'bsTap', 'bsWhich'], plays: [['bsRatio', 'bsTap'], ['bsWhich', 'bsRatio'], ['bsTap', 'MAB']],
+  { ch: 4, lv: 4, title: '第4章 内角の 二等分線', forms: ['bsRatio', 'bsMid', 'bsWhich'], plays: [['bsRatio', 'bsMid'], ['bsWhich', 'bsRatio'], ['bsMid', 'MAB']],
     mab: { form: 'mabBsLen', name: 'ブンスウワケ', sprite: '🍰', tip: 'BD : DC ＝ m : n → BD は BC の {m|m ＋ n}' },
     boss: { name: 'ウチカクオウ', sprite: '🔺' } },
   { ch: 5, lv: 5, title: '第5章 外角の 二等分線', forms: ['exRatio', 'exPlace', 'exTap'], plays: [['exRatio', 'exPlace'], ['exTap', 'exRatio'], ['exPlace', 'MAB']],
@@ -796,8 +815,8 @@ const MONSTERS = [
   ['stepOut', 'モドリアシ', '↩️', '外分は AB を（多いほう − 少ないほう）等分 → 1歩'],
   ['masOut', 'ソトマス', '🔭', '外分も 1歩 ＝ {マス|歩}。AP は 外へ 1歩 × m'],
   ['placeST', 'サキモジ', '🔤', '線分BA は 先に 書いて ある B が スタート。外分は スタート B で 歩数を くらべる'],
-  ['bsRatio', 'ニトウブン', '⚖️', '∠A の 二等分線：BD : DC ＝ AB : AC（角を はさむ 2辺）'],
-  ['bsTap', 'ウチワケ', '📍', 'D は 辺 BC を AB : AC に 内分（6 : 4 ＝ 3 : 2 → B から 3つめの 区切り）'],
+  ['bsRatio', 'ニトウブン', '⚖️', '∠A の 二等分線：BD : DC ＝ AB : AC（6 : 4 の まま）'],
+  ['bsMid', 'ヨリカタ', '📍', 'D は 短い ほうの 辺の がわに 寄る（AB ＝ AC なら ちょうど 中点）'],
   ['bsWhich', 'カクハサミ', '🧩', 'AB : AC ＝ BD : DC（BC 全体 では ない）'],
   ['exRatio', 'ソトニトウ', '🧭', '外角の 二等分線も BE : EC ＝ AB : AC（E は 外分）'],
   ['exPlace', 'ソトデル', '🚩', 'E は 短い ほうの 辺の がわの 外'],
@@ -842,7 +861,7 @@ const GEN = {
   mabMasOut: (rng, slot) => Object.assign(masPrm(rng, 'out', slot, true), { mode: 'masOut' }),
   // 第4章・第5章：角の 二等分線
   bsRatio: rng => triPrm(...pick(rng, BS_TRI), 'in'),
-  bsTap: rng => triPrm(...pick(rng, BS_TRI), 'in'),
+  bsMid: rng => triPrm(...pick(rng, rng() < 0.2 ? MID_EQ : BS_TRI), 'in'),
   bsWhich: rng => triPrm(...pick(rng, BS_TRI), 'in'),
   exRatio: rng => triPrm(...pick(rng, EX_TRI), 'out'),
   exPlace: rng => triPrm(...pick(rng, EX_TRI), 'out'),
@@ -909,7 +928,7 @@ function tapTypes(q, x) {
 function triTapTypes(q, x) {   // 辺 BC の 目盛りを タップ（D・E）
   const L = nl(q), lo = Math.min(L.A, L.B), hi = Math.max(L.A, L.B);
   if (x === L.ans) return [];
-  if (q.io === 'in') { if (x < lo || x > hi) return ['inBC']; if (x === L.S + L.dir * q.n) return ['swapS']; return ['countT']; }
+  if (q.io === 'in') return x === L.S + L.dir * q.n ? ['swapS'] : ['countT'];
   if (x >= lo && x <= hi) return ['inside'];
   return (L.ans < lo) !== (x < lo) ? ['sideEx'] : ['countT'];
 }
@@ -933,14 +952,15 @@ const TYPE_TEXT = {
   sum: '外分では A から B までは 歩数の 差（もどる 歩を 引く）', pts: '点の 数では なく 歩の 数で 分ける', one: '片方の 歩数だけで 分けた',
   swapS: '順が 逆（BD : DC ＝ AB : AC。B の がわ どうし、C の がわ どうし）', side3: '二等分線で 分かれる 比は、角を はさむ 2辺 AB と AC の 比',
   wholeBC: 'BC 全体 では なく、D で 区切った DC', ratioF: 'BD : DC ＝ m : n なら BD は BC の {m|m ＋ n}（比を そのまま 分数に しない）',
-  countT: '区切りの 数えかたが ちがう（AB : AC を 約分した 数で、B から 数える）', inBC: '内角の 二等分線は 辺 BC の 上（B と C の 間）で 交わる',
+  countT: '区切りの 数えかたが ちがう（AB : AC を 約分した 数で、B から 数える）',
+  midSide: 'D は 短い ほうの 辺の がわに 寄る（BD : DC ＝ AB : AC）', midEq: 'AB ≠ AC なら 中点 では ない', midNot: 'AB ＝ AC なら BD ＝ DC → ちょうど 中点',
   inside: '外角の 二等分線は 辺 BC の 外で 交わる（内分 では なく 外分）', sideEx: '外分は 短い ほうの 辺の がわの 外に 出る（AB ＞ AC なら C より 外）',
   scatter: 'えらびかたが ばらばら',
 };
 const MASTER_TEXT = {
   inout: '内分と 外分', side: '外に 出る がわ', ab: 'スタートと ゴール', swap: '歩数の 順',
   count: '歩数の 数えかた', tick: '1歩の 長さ', flipM: '1歩の マス', swapS: '比の 順', side3: '角を はさむ 2辺', wholeBC: '区切った 線分', ratioF: 'BC の 何分の何', countT: '区切りの 数えかた',
-  inBC: '内角は 内分', inside: '外角は 外分', sideEx: '外に 出る がわ', diff: '内分の 歩数', sum: '外分の 歩数', pts: '歩の 数', one: '両方の 歩数',
+  midSide: '寄る がわ', midEq: '中点', midNot: '中点', inside: '外角は 外分', sideEx: '外に 出る がわ', diff: '内分の 歩数', sum: '外分の 歩数', pts: '歩の 数', one: '両方の 歩数',
 };
 function describe(p, cls) { return cls.types.map(t => (t === 'scatter' && p.options ? 'ちがう ものを えらんだ' : TYPE_TEXT[t])).join('、'); }
 function masterText(t) { return MASTER_TEXT[t]; }
@@ -988,7 +1008,8 @@ const figKey = prm => JSON.stringify([prm.m, prm.n, prm.io, prm.st, prm.mode]); 
 function makeProblem(slot, ctx, rng) {
   const w = ctx.weak[slot.lv];
   const forms = slot.form ? [slot.form] : CHAPTERS[slot.lv - 1].forms;
-  const fresh = prm => !ctx.recentFig.includes(figKey(prm)) && !ctx.recent.includes(JSON.stringify(prm));
+  const triKey = prm => (isTri(prm) ? prm.c + ':' + prm.b : null);   // 同じ 辺の 三角形は 続けない（形が ちがっても）
+  const fresh = prm => !ctx.recentFig.includes(figKey(prm)) && !ctx.recent.includes(JSON.stringify(prm)) && !(triKey(prm) && (ctx.recentTri || []).includes(triKey(prm)));
   const gen = () => genPrm(pick(rng, forms), rng, slot);
   let prm = null, target = false;
   if (w) for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (likeOK(c, w.like, w.types) && fresh(c)) { prm = c; target = true; } }
@@ -1002,6 +1023,7 @@ function makeProblem(slot, ctx, rng) {
   p.key = JSON.stringify(prm);
   ctx.recent.push(p.key);
   if (ctx.recent.length > 8) ctx.recent.shift();
+  if (triKey(prm)) { ctx.recentTri = (ctx.recentTri || []).concat([triKey(prm)]).slice(-2); }
   ctx.recentFig.push(figKey(prm));
   if (ctx.recentFig.length > 2) ctx.recentFig.shift();
   return p;
@@ -1022,7 +1044,7 @@ function record(ctx, p, ok, cls, ms) {
 
 G.NaibunCore = {
   FIG, PAIRS, IN_PAIRS, OUT_PAIRS, MAS_PAIRS, masP, masD, masPrm, isMas, useStep, fracStr, MAB_IN, MAB_OUT, coordCs, nl, nlFx, nlAt, placeOf, coordAt, swapST, AREA, areaAt, areaFx, pairQ, TAP, INTRO, DATA_V, migrateProg, migrateZk,
-  BS_TRI, EX_TRI, EQ_TRI, TRI_MODES, isTri, triGeo, triPrm, triTapTypes, triPlaceTypes, PLAYS,
+  BS_TRI, EX_TRI, EQ_TRI, MID_EQ, TRI_MODES, isTri, triGeo, triPrm, triTapTypes, triPlaceTypes, PLAYS,
   CHAPTERS, NORM_CH, FORM_LV, MONSTERS, monsterOf, zukanAfter, zukanCount, GEN, genPrm, makeOptions, build, figKey, judge, classify, tapTypes,
   describe, masterText, likeOK, TYPE_TEXT, MASTER_TEXT, MID_HP, FINAL_HP, zakoHP, midHP, finalHP, CRIT, comboBonus, damage, makeSlots,
   newContext, makeProblem, record, mulberry32,
@@ -1239,7 +1261,7 @@ function viewKind() {
   if (state.reveal && !(state.phase === 'next' && state.view === 'mine')) return 'ans';
   return state.reveal ? 'mine' : 'ask';
 }
-const TICK_MODES = ['tapIn', 'tapOut', 'readIn', 'readOut', 'bsTap', 'exTap'];   // 目盛りを はじめから 見せる 形（ほかは 答えの あと）
+const TICK_MODES = ['tapIn', 'tapOut', 'readIn', 'readOut', 'bsMid', 'exTap'];   // 目盛りを はじめから 見せる 形（ほかは 答えの あと）
 function hop(ctx, g, x0, x1, up, col, h) {   // 1歩：上（オレンジ）か 下（青）に 弧
   ctx.strokeStyle = col; ctx.lineWidth = 2.4 * g.d;
   ctx.beginPath(); ctx.moveTo(x0, g.y); ctx.quadraticCurveTo((x0 + x1) / 2, g.y + (up ? -2 : 2) * h, x1, g.y); ctx.stroke();
@@ -1319,18 +1341,27 @@ function draw() {
 // ---------- 三角形と 角の 二等分線（第4章・第5章）----------
 // 直線 BC は 数直線と 同じ 目盛り（B ＝ 目盛り A の 位置、C ＝ 目盛り B の 位置）。A は 三角形の 形から（高すぎる ときは 低く）
 function drawTri(ctx, g, q) {
-  const m = q.prm, L = C.nl(m), W = g.W, H = g.H, d = g.d, y0 = Math.min(H * C.FIG.TY, H - 24 * g.d), X = t => C.nlFx(L, t) * W, vk = viewKind(), rev = state.reveal, showAns = vk === 'ans' && rev;
-  const xB = X(L.A), xC = X(L.B), G = C.triGeo(m), s = (xC - xB) / m.a;
-  const sv = m.io === 'out' ? Math.max(s, (y0 - 40 * d) * 0.8 / G.ay) : s;   // 外角の 図は BC が 短いので、三角形を たてに 大きく（目盛りは そのまま）
-  const ax = xB + G.ax * s, ay = Math.max(30 * d, y0 - G.ay * sv);
+  const m = q.prm, L = C.nl(m), W = g.W, H = g.H, d = g.d, y0 = Math.min(H * C.FIG.TY, H - 24 * g.d), vk = viewKind(), rev = state.reveal, showAns = vk === 'ans' && rev;
+  // たても 横も 同じ 縮尺（三角形を 引きのばすと 二等分線の 向きが くずれる。11-01 先生）。B ＝ 0、C ＝ a の 長さの 世界で 描く
+  const G = C.triGeo(m), unit = m.a / (m.io === 'in' ? m.m + m.n : Math.abs(m.m - m.n));   // 1区切り（1歩）の 長さ
+  const wD = m.a * m.m / (m.m + m.n), wE = m.io === 'out' && !L.none ? L.ans * unit : null;
+  const grid = ['exTap', 'exPlace'].includes(m.mode);   // 区切り・範囲を タップする 図は 数直線と 同じ 位置（タップの 判定と あわせる）
+  let X, s;
+  if (grid) { X = w => C.nlFx(L, w / unit) * W; s = (X(m.a) - X(0)) / m.a; }
+  else {
+    const xs = [0, m.a, G.ax].concat(wE !== null ? [wE] : []), x0 = Math.min(...xs), x1 = Math.max(...xs);
+    s = Math.min(W * 0.84 / (x1 - x0), (y0 - 36 * d) / G.ay);
+    const cx = W / 2 - (x0 + x1) / 2 * s; X = w => cx + w * s;
+  }
+  const xB = X(0), xC = X(m.a), ax = X(G.ax), ay = Math.max(30 * d, y0 - G.ay * s);
   const io = m.mode === 'exBoth' ? 'both' : m.io, P = m.io === 'in' ? 'D' : 'E';
-  const xD = xB + (xC - xB) * m.m / (m.m + m.n);   // 内角の 二等分線の 点 D（BC を m:n に 内分）
-  const xE = m.io === 'out' && !L.none ? X(L.ans) : null;
+  const xD = X(wD), xE = wE !== null ? X(wE) : null;
+  const eLeft = xE !== null && xE < xB, xExt = eLeft ? xC : xB, xSide = eLeft ? xB : xC;   // 外角：E が C より 右 → BA を のばす（外角は AC と その 延長の あいだ）。E が B より 左 → CA を のばす
   // 直線 BC（外角の 問題は 左右に のばす）
   seg(ctx, g, 0.015 * W, y0, 0.985 * W, y0, m.io === 'out' ? '#fff' : 'rgba(255,255,255,0.3)', m.io === 'out' ? 2 : 1.4);
   seg(ctx, g, xB, y0, xC, y0, '#fff', 2.4);
-  if (TICK_MODES.includes(m.mode) || rev) for (let t = L.lo; t <= L.hi; t++) seg(ctx, g, X(t), y0 - 6 * d, X(t), y0 + 6 * d, GRAY, 1.4);
-  if (state.tut && state.tut.step === 'tap' && state.blinkOn && L.ans !== null && !isArea(q)) { ctx.beginPath(); ctx.arc(X(L.ans), y0, 14 * d, 0, Math.PI * 2); ctx.fillStyle = HINT_COL; ctx.fill(); }
+  if (grid && (TICK_MODES.includes(m.mode) || rev)) for (let t = L.lo; t <= L.hi; t++) seg(ctx, g, X(t * unit), y0 - 6 * d, X(t * unit), y0 + 6 * d, GRAY, 1.4);
+  if (state.tut && state.tut.step === 'tap' && state.blinkOn && L.ans !== null && !isArea(q)) { ctx.beginPath(); ctx.arc(X(L.ans * unit), y0, 14 * d, 0, Math.PI * 2); ctx.fillStyle = HINT_COL; ctx.fill(); }
   // 範囲を えらぶ（E は どの 範囲に ある？）：えらんだ 場所（青）・正しい 場所（きいろ）
   if (isArea(q)) {
     const leftKey = 'outA', span = key => (key === 'mid' ? [xB, xC] : key === leftKey ? [0.015 * W, xB] : [xC, 0.985 * W - 8 * d]);
@@ -1347,24 +1378,44 @@ function drawTri(ctx, g, q) {
   }
   // 三角形
   seg(ctx, g, ax, ay, xB, y0, colAB, 2.4); seg(ctx, g, ax, ay, xC, y0, colAC, 2.4);
-  if (m.io === 'out') {   // 外角：BA を A の 先へ のばした 点線
-    const ux = (ax - xB), uy = (ay - y0), l = Math.hypot(ux, uy), k = 46 * d / l;
-    ctx.setLineDash([5 * d, 4 * d]); seg(ctx, g, ax, ay, ax + ux * k, ay + uy * k, GRAY, 1.6); ctx.setLineDash([]);
+  if (m.io === 'out') {   // 外角：BA を A の 先へ のばした 点線（外角は AC と この 点線の あいだ）
+    const ux = (ax - xExt), uy = (ay - y0), l = Math.hypot(ux, uy), k = Math.min(70 * d, (ay - 6 * d) / Math.max(1e-6, -uy / l) ) / l;
+    ctx.setLineDash([5 * d, 4 * d]); seg(ctx, g, ax, ay, ax + ux * k, ay + uy * k, 'rgba(255,255,255,0.75)', 1.8); ctx.setLineDash([]);
+  }
+  // ザコ戦の「BD : DC は？」「BE : EC は？」：はじめから 弧を かく（どこと どこの 長さか）。上の オレンジ ＝ BD（BE）、下の 青 ＝ DC（EC）
+  if (!q.exam && !showAns && ['bsRatio', 'exRatio'].includes(m.mode)) {
+    const tx = m.io === 'in' ? xD : xE, ht = Math.min(26 * d, (y0 - ay) * 0.35);
+    const big = (x0, x1, up, col, t) => { ctx.strokeStyle = col; ctx.lineWidth = 2.4 * d; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo((x0 + x1) / 2, y0 + (up ? -2 : 2) * ht, x1, y0); ctx.stroke(); textAt(ctx, g, t, (x0 + x1) / 2, Math.min(H - 8 * d, y0 + (up ? -1 : 1) * (ht + 6 * d)), col, 'center', 12); };
+    big(xB, tx, true, ORANGE, 'B' + P); big(tx, xC, false, '#8fb4ff', P + 'C');
   }
   // 辺の 長さ
   const lab = (x0, y0_, x1, y1, t, col, side) => { const mx = (x0 + x1) / 2, my = (y0_ + y1) / 2, nx = -(y1 - y0_), ny = x1 - x0, nl_ = Math.hypot(nx, ny) || 1; textAt(ctx, g, t, mx + side * nx / nl_ * 13 * d, my + side * ny / nl_ * 13 * d, col, 'center', 14); };
   lab(xB, y0, ax, ay, String(m.c), showAns ? ORANGE : CYAN, -1); lab(ax, ay, xC, y0, String(m.b), showAns ? '#8fb4ff' : CYAN, -1);   // 三角形の 外がわに
   if (m.mode === 'bsLen') textAt(ctx, g, 'BC ＝ ' + m.a, (xB + xC) / 2, y0 + 30 * d, '#ccc', 'center', 12);
+  // 中点 M（中点より どっち？）
+  if (m.mode === 'bsMid') { const xM = (xB + xC) / 2; seg(ctx, g, xM, y0 - 9 * d, xM, y0 + 9 * d, '#ccc', 2); textAt(ctx, g, 'M', xM, y0 + 15 * d, '#ccc', 'center', 13); }
   // 二等分線
   const showD = ['bsRatio', 'bsWhich', 'bsLen', 'exBoth'].includes(m.mode) || (showAns && m.io === 'in');
   const showE = ['exRatio', 'exBoth'].includes(m.mode) || (showAns && m.io === 'out');
-  const arcs = (a1, a2, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1.8 * d; ctx.beginPath(); ctx.arc(ax, ay, 16 * d, Math.min(a1, a2), Math.max(a1, a2)); ctx.stroke(); };
+  const arcs = (a1, a2, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1.8 * d; arcAt(16 * d, a1, a2); };
   const ang = (x, y) => Math.atan2(y - ay, x - ax);
+  const arcAt = (r, a1, a2) => { const dd = ((a2 - a1) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI; ctx.beginPath(); ctx.arc(ax, ay, r, a1, a1 + dd, dd < 0); ctx.stroke(); };   // 角の 印：いつも 短い ほうの 向きで
+  // 答える 前の D・E の 場所を 聞く 問題：二等分線は A から 途中まで（∠ を 2つに 分ける 印つき）。BC との 交わる 所は 見せない
+  if (!showAns && ['bsMid', 'exPlace', 'exTap'].includes(m.mode)) {
+    const tx = m.io === 'in' ? xD : xE, ux = tx - ax, uy = y0 - ay, part = (f0, f1) => [ax + ux * f0, ay + uy * f0, ax + ux * f1, ay + uy * f1];
+    if (tx !== null) {
+      seg(ctx, g, ...part(0, 0.4), CYAN, 2.2); ctx.setLineDash([4 * d, 4 * d]); seg(ctx, g, ...part(0.4, 0.6), CYAN, 1.6); ctx.setLineDash([]);
+      const aT = ang(tx, y0), [a1, a2] = m.io === 'in' ? [ang(xB, y0), ang(xC, y0)] : [ang(xSide, y0), Math.atan2(ay - y0, ax - xExt)];
+      ctx.strokeStyle = CYAN; ctx.lineWidth = 1.8 * d;
+      arcAt(16 * d, a1, aT);
+      arcAt(21 * d, a2, aT);
+    }
+  }
   if (showD) {
     const col = showAns ? YEL : CYAN;
     seg(ctx, g, ax, ay, xD, y0, col, 2.2); dotAt(ctx, Object.assign({}, g, { y: y0 }), xD, col, 5.5);
     textAt(ctx, g, 'D', xD, y0 + 15 * d, col, 'center', 14);
-    const aB = ang(xB, y0), aD = ang(xD, y0), aC = ang(xC, y0); arcs(aB, aD, col); ctx.beginPath(); ctx.arc(ax, ay, 21 * d, Math.min(aD, aC), Math.max(aD, aC)); ctx.stroke();
+    const aB = ang(xB, y0), aD = ang(xD, y0), aC = ang(xC, y0); arcs(aB, aD, col); arcAt(21 * d, aD, aC);
   }
   if (showE) {
     const col = showAns ? YEL : CYAN;
@@ -1374,10 +1425,14 @@ function drawTri(ctx, g, q) {
     } else {
       seg(ctx, g, ax, ay, xE, y0, col, 2.2); dotAt(ctx, Object.assign({}, g, { y: y0 }), xE, col, 5.5);
       textAt(ctx, g, 'E', xE, y0 + 15 * d, col, 'center', 14);
+      const aE = ang(xE, y0), aC = ang(xSide, y0), aX = Math.atan2(ay - y0, ax - xExt);   // 外角を 2つに 分ける 印（AC と AE、AE と BA の 延長。E が 左なら AB と CA の 延長）
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8 * d;
+      arcAt(16 * d, aC, aE);
+      arcAt(21 * d, aX, aE);
     }
   }
   // えらんだ 目盛り（青）
-  if (tapMode(q) && !isArea(q) && state.sel.pos !== null && vk !== 'ans') { dotAt(ctx, Object.assign({}, g, { y: y0 }), X(state.sel.pos), BLUE, 7.5); textAt(ctx, g, P, X(state.sel.pos), y0 + 15 * d, '#8fb4ff', 'center', 14); }
+  if (tapMode(q) && !isArea(q) && state.sel.pos !== null && vk !== 'ans') { dotAt(ctx, Object.assign({}, g, { y: y0 }), X(state.sel.pos * unit), BLUE, 7.5); textAt(ctx, g, P, X(state.sel.pos * unit), y0 + 15 * d, '#8fb4ff', 'center', 14); }
   // 頂点
   dotAt(ctx, Object.assign({}, g, { y: ay }), ax, '#fff', 4.5); textAt(ctx, g, 'A', ax, ay - 14 * d, '#fff', 'center', 15);
   [['B', xB], ['C', xC]].forEach(([t, x]) => { dotAt(ctx, Object.assign({}, g, { y: y0 }), x, '#fff', 4.5); textAt(ctx, g, t, x + (t === 'B' ? -1 : 1) * 10 * d, y0 + 15 * d, '#fff', 'center', 15); });
