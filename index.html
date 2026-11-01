@@ -531,6 +531,7 @@ function nl(q) {
   const S = q.st === 'B' ? B : A, E = q.st === 'B' ? A : B, dir = Math.sign(E - S);
   const ans = none ? null : io === 'out' && m < n ? S - dir * m * k : S + dir * m * k;   // スタートから m歩（外分で m ＜ n なら スタートの 外へ）
   const ext = (io === 'in' ? 1 : Math.min(m, n) + 1) * k;   // A・B の 外に 見せる はば（反対がわの 外も 同じだけ 見せる）
+  if (q.c && io === 'out' && !none) return { k, D, A, B, S, E, dir, ans, none, lo: Math.min(A, B, ans) - k, hi: Math.max(A, B, ans) + k };   // 三角形の 外角：二等分線の 向きで がわは わかるので、区切りは B・C・E の まわり だけ（三角形を 大きく）
   return { k, D, A, B, S, E, dir, ans, none, lo: Math.min(A, B) - ext, hi: Math.max(A, B) + ext };
 }
 const nlFx = (L, t) => FIG.L + (t - L.lo) / (L.hi - L.lo) * (FIG.R - FIG.L);   // 目盛り t の 横の 位置（図の 幅に 対する 割合）
@@ -550,7 +551,7 @@ function placeOf(q) {   // 'mid'（A と B の 間）・'outA'・'outB'・'none'
 // 三角形 ABC：AB ＝ c、AC ＝ b、BC ＝ a。D（内角）・E（外角）は 辺 BC を c:b（約分して m:n）に 内分・外分する。
 // 直線 BC は 数直線と 同じ しくみ（nl）：B が 目盛り A の 位置、C が 目盛り B の 位置（io・m・n を 同じ 形で 持つ）
 const BS_TRI = [[6, 4], [4, 6], [6, 3], [3, 6], [5, 3], [3, 5], [8, 6], [6, 8], [4, 5], [5, 4], [6, 2], [2, 6]];
-const EX_TRI = [[6, 3], [3, 6], [6, 2], [2, 6], [5, 2], [2, 5], [8, 2], [2, 8]];   // E が 遠く なりすぎない 比（6:4・5:3 は E が 遠く、三角形が 小さく なるので 出さない。11-01）
+const EX_TRI = [[6, 3], [3, 6], [6, 2], [2, 6], [5, 2], [2, 5], [4, 2], [2, 4]];   // 4:1（8 と 2）は 背を 高く しても 平たい ので 出さない   // E が 遠く なりすぎない 比（6:4・5:3 は E が 遠く、三角形が 小さく なるので 出さない。11-01）
 const EQ_TRI = [];
 const MID_EQ = [[4, 4], [5, 5], [6, 6]];   // 中点より どっち？：AB ＝ AC は ちょうど 中点（1:1 の 内分は よい）   // AB ＝ AC（外角の 二等分線が BC と 平行で 点 E が ない）は 出さない（初学者には きつい。10-31）
 const TRI_MODES = ['bsRatio', 'bsMid', 'bsWhich', 'bsLen', 'exRatio', 'exPlace', 'exTap', 'exBoth'];
@@ -654,7 +655,7 @@ function makeOptions(q, rng) {
   }
   if (mode === 'bsRatio' || mode === 'exRatio') {   // BD : DC（BE : EC）は どの 辺の 比？
     const c = q.c, b = q.b, a = q.a;   // 比は 辺の 長さの まま（約分 しない。文字の AB : AC と そろえる。11-01 先生）
-    add(c + ' : ' + b, 'r', []); add(b + ' : ' + c, 's', ['swapS']); add(c + ' : ' + a, 't', ['side3']); add(b + ' : ' + a, 'u', ['side3']);
+    add(c + ' : ' + b, 'r', []); add(b + ' : ' + c, 's', ['swapS']); add(c + ' : ' + (c + b), 't', ['wholeR']); add(b + ' : ' + (c + b), 'u', ['wholeR']);   // BC の 長さは 図にも 問題にも ないので、はずれは「全体（和）と くらべた」
   }
   if (mode === 'bsWhich') { add('DC', 'r', []); add('BC', 'w', ['wholeBC']); add('AD', 'a', ['side3']); }
   if (mode === 'bsLen') {   // BD は BC の 何分の何
@@ -664,8 +665,9 @@ function makeOptions(q, rng) {
   if (mode === 'exBoth') {   // 内角と 外角の 両方
     fixed = false;
     const c = q.c, b = q.b, a = q.a;
-    add('どちらも ' + c + ' : ' + b, 'r', []); add('D は ' + c + ' : ' + b + '、E は ' + b + ' : ' + c, 's', ['swapS']);
-    add('どちらも ' + b + ' : ' + c, 't', ['swapS']); add('D は ' + c + ' : ' + b + '、E は ' + c + ' : ' + a, 'u', ['side3']);
+    const R = (x, y) => x + ' : ' + y;   // BD : DC、BE : EC の 順に 比を ならべる（11-01 先生：「D は」「E は」だと 点 ＝ 比 に 見える）
+    add(R(c, b) + '、' + R(c, b), 'r', []); add(R(c, b) + '、' + R(b, c), 's', ['swapS']);
+    add(R(b, c) + '、' + R(b, c), 't', ['swapS']); add(R(c, b) + '、' + R(c, c + b), 'u', ['wholeR']);
   }
   if (mode === 'bsMid') {   // D は BC の 中点より どっち？（短い ほうの 辺の がわに 寄る）
     fixed = true;
@@ -706,8 +708,9 @@ function masTexts(q) {
   const AB = q.a ? '2点 A(' + num(q.a) + ')、B(' + num(q.a + q.L) + ')' : 'AB ＝ ' + q.L + 'マス', what = q.a ? 'P の 座標' : 'AP';
   if (q.st2 !== 2) return [['▼ ① 1歩は 何マス？', AB + '。' + s + ' を ' + r + ' に ' + io + 'する 点 P。1歩は 何マス？'],
     [(q.a ? '数直線 上の ' + AB + ' に ついて、' : '線分AB の 長さが ' + q.L + ' の とき、') + s + ' を ' + r + ' に ' + io + 'する 点 P の ' + (q.a ? '座標' : 'AP の 長さ') + 'を 求めよ。まず 1歩分の 長さは？']];
+  const head = (q.a ? '数直線 上の ' + AB + ' に ついて、' : '線分AB の 長さが ' + q.L + ' の とき、') + s + ' を ' + r + ' に ' + io + 'する 点 P。';   // ② でも 問題を のこす（P の 位置を 忘れないように。11-01 先生）
   return [['▼ ② ' + what + 'は？', '1歩 ＝ ' + S + 'マス。' + s + ' を ' + r + ' に ' + io + 'する 点 P。' + what + 'は？'],
-    ['1歩分の 長さは ' + S + '。' + (q.a ? 'P の 座標' : 'AP の 長さ') + 'を 求める 式は？']];
+    [head + '1歩分の 長さは ' + S + '。' + (q.a ? 'P の 座標' : 'AP の 長さ') + 'を 求める 式は？']];
 }
 function triTexts(q) {
   const tri = '△ABC で、AB ＝ ' + q.c + '、AC ＝ ' + q.b + ' と する。';
@@ -720,7 +723,7 @@ function triTexts(q) {
     exRatio: () => [['▼ BE : EC は？', 'AE は ∠A の 外角の 二等分線。BE : EC ＝ ？'], [tri + exE + 'BE : EC を 求めよ。']],
     exPlace: () => [['▼ どの 範囲？', 'AE は ∠A の 外角の 二等分線。E は どの 範囲に ある？'], [tri + exE + '点 E は どの 範囲に あるか、図で 選べ。']],
     exTap: () => [['▼ E を タップ', 'AE は ∠A の 外角の 二等分線。E の 場所を タップ'], [tri + exE + '点 E の 位置を 図示せよ。']],
-    exBoth: () => [['▼ 内角と 外角', 'AD は ∠A の、AE は ∠A の 外角の 二等分線。BD : DC と BE : EC は？'], [tri + inD + exE + 'BD : DC と BE : EC を 求めよ。']],
+    exBoth: () => [['▼ 内角と 外角', 'AD は ∠A の、AE は ∠A の 外角の 二等分線。BD : DC、BE : EC の それぞれの 比は？'], [tri + inD + exE + 'BD : DC、BE : EC を それぞれ 求めよ。']],
   };
   return T[q.mode]();
 }
@@ -953,6 +956,7 @@ const TYPE_TEXT = {
   swapS: '順が 逆（BD : DC ＝ AB : AC。B の がわ どうし、C の がわ どうし）', side3: '二等分線で 分かれる 比は、角を はさむ 2辺 AB と AC の 比',
   wholeBC: 'BC 全体 では なく、D で 区切った DC', ratioF: 'BD : DC ＝ m : n なら BD は BC の {m|m ＋ n}（比を そのまま 分数に しない）',
   countT: '区切りの 数えかたが ちがう（AB : AC を 約分した 数で、B から 数える）',
+  wholeR: '全体（AB ＋ AC）と くらべない：BD : DC ＝ AB : AC',
   midSide: 'D は 短い ほうの 辺の がわに 寄る（BD : DC ＝ AB : AC）', midEq: 'AB ≠ AC なら 中点 では ない', midNot: 'AB ＝ AC なら BD ＝ DC → ちょうど 中点',
   inside: '外角の 二等分線は 辺 BC の 外で 交わる（内分 では なく 外分）', sideEx: '外分は 短い ほうの 辺の がわの 外に 出る（AB ＞ AC なら C より 外）',
   scatter: 'えらびかたが ばらばら',
@@ -960,7 +964,7 @@ const TYPE_TEXT = {
 const MASTER_TEXT = {
   inout: '内分と 外分', side: '外に 出る がわ', ab: 'スタートと ゴール', swap: '歩数の 順',
   count: '歩数の 数えかた', tick: '1歩の 長さ', flipM: '1歩の マス', swapS: '比の 順', side3: '角を はさむ 2辺', wholeBC: '区切った 線分', ratioF: 'BC の 何分の何', countT: '区切りの 数えかた',
-  midSide: '寄る がわ', midEq: '中点', midNot: '中点', inside: '外角は 外分', sideEx: '外に 出る がわ', diff: '内分の 歩数', sum: '外分の 歩数', pts: '歩の 数', one: '両方の 歩数',
+  wholeR: '2辺の 比', midSide: '寄る がわ', midEq: '中点', midNot: '中点', inside: '外角は 外分', sideEx: '外に 出る がわ', diff: '内分の 歩数', sum: '外分の 歩数', pts: '歩の 数', one: '両方の 歩数',
 };
 function describe(p, cls) { return cls.types.map(t => (t === 'scatter' && p.options ? 'ちがう ものを えらんだ' : TYPE_TEXT[t])).join('、'); }
 function masterText(t) { return MASTER_TEXT[t]; }
@@ -1343,17 +1347,25 @@ function draw() {
 function drawTri(ctx, g, q) {
   const m = q.prm, L = C.nl(m), W = g.W, H = g.H, d = g.d, y0 = Math.min(H * C.FIG.TY, H - 24 * g.d), vk = viewKind(), rev = state.reveal, showAns = vk === 'ans' && rev;
   // たても 横も 同じ 縮尺（三角形を 引きのばすと 二等分線の 向きが くずれる。11-01 先生）。B ＝ 0、C ＝ a の 長さの 世界で 描く
-  const G = C.triGeo(m), unit = m.a / (m.io === 'in' ? m.m + m.n : Math.abs(m.m - m.n));   // 1区切り（1歩）の 長さ
-  const wD = m.a * m.m / (m.m + m.n), wE = m.io === 'out' && !L.none ? L.ans * unit : null;
+  // 図の 三角形：AB : AC の 比は そのまま、A を できるだけ 高く（BC の 長さは 図に 合わせる）。BC を 問題に 出す まぼろし（bsLen）だけ 本当の 長さ（11-01 先生）
+  // A は「AB : AC ＝ c : b」に なる 点の 円（D と E を 直径の 両はしと する 円）の 上で、なるべく 高い 所（BC ＝ 1 と して）。AB ＝ AC は 垂直二等分線の 上
+  const apex = () => {
+    if (m.c === m.b) return { ax: 0.5, ay: 0.75 };
+    const Dx = m.c / (m.c + m.b), Ex = m.c / (m.c - m.b), O = (Dx + Ex) / 2, r = Math.abs(Ex - Dx) / 2, [lo, hi] = m.io === 'in' ? [0.15, 0.85] : [-0.2, 1.2], x = Math.min(hi, Math.max(lo, O));   // 内角は A を B と C の あいだの 上に
+    return { ax: x, ay: Math.sqrt(Math.max(0, r * r - (x - O) * (x - O))) };
+  };
+  const a_ = m.mode === 'bsLen' ? m.a : 1, G = m.mode === 'bsLen' ? C.triGeo(m) : apex();
+  const unit = a_ / (m.io === 'in' ? m.m + m.n : Math.abs(m.m - m.n));   // 1区切り（1歩）の 長さ
+  const wD = a_ * m.m / (m.m + m.n), wE = m.io === 'out' && !L.none ? L.ans * unit : null;
   const grid = ['exTap', 'exPlace'].includes(m.mode);   // 区切り・範囲を タップする 図は 数直線と 同じ 位置（タップの 判定と あわせる）
   let X, s;
-  if (grid) { X = w => C.nlFx(L, w / unit) * W; s = (X(m.a) - X(0)) / m.a; }
+  if (grid) { X = w => C.nlFx(L, w / unit) * W; s = (X(a_) - X(0)) / a_; }
   else {
-    const xs = [0, m.a, G.ax].concat(wE !== null ? [wE] : []), x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const xs = [0, a_, G.ax].concat(wE !== null ? [wE] : []), x0 = Math.min(...xs), x1 = Math.max(...xs);
     s = Math.min(W * 0.84 / (x1 - x0), (y0 - 36 * d) / G.ay);
     const cx = W / 2 - (x0 + x1) / 2 * s; X = w => cx + w * s;
   }
-  const xB = X(0), xC = X(m.a), ax = X(G.ax), ay = Math.max(30 * d, y0 - G.ay * s);
+  const xB = X(0), xC = X(a_), ax = X(G.ax), ay = Math.max(30 * d, y0 - G.ay * s);
   const io = m.mode === 'exBoth' ? 'both' : m.io, P = m.io === 'in' ? 'D' : 'E';
   const xD = X(wD), xE = wE !== null ? X(wE) : null;
   const eLeft = xE !== null && xE < xB, xExt = eLeft ? xC : xB, xSide = eLeft ? xB : xC;   // 外角：E が C より 右 → BA を のばす（外角は AC と その 延長の あいだ）。E が B より 左 → CA を のばす
